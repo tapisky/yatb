@@ -6,12 +6,10 @@ Yet another trading bot
 ## Setting up
 
 *python3
-*To run this project, you may need to install the following python modules:
+*Check requitements.py!
 
 ```
-pip3 install cryptocom.exchange
 pip3 install pyyaml
-pip3 install krakenex # it's recommended to install for the user -> pip3 install --user krakenex
 pip3 install python-binance
 ```
 
@@ -21,6 +19,9 @@ pip3 install python-binance
 2. Rename it as "user_config.yaml" and add there your API keys and set the other values as you wish
 
 Be careful! -> Do not set your API keys in default_config.yaml and push the file to git!
+
+## Google sheets
+Configuration -> https://developers.google.com/sheets/api/quickstart/python
 
 ## Disclaimer
 This project is for educational purposes only. You should not construe any such information or other material as legal, tax, investment, financial, or other advice. Nothing contained here constitutes a solicitation, recommendation, endorsement, or offer by me or any third party service provider to buy or sell any securities or other financial instruments in this or in any other jurisdiction in which such solicitation or offer would be unlawful under the securities laws of such jurisdiction.

@@ -120,16 +120,16 @@ async def main():
                     # Get current 4H candle high and low prices of trade['pair']
                     for _ in range(5):
                         try:
-                            kline4Hours = bnb_exchange.get_historical_klines(pair, bnb_exchange.KLINE_INTERVAL_4HOUR, "4 hours ago UTC")
+                            kline4Hours = bnb_exchange.get_historical_klines(trade['pair'], bnb_exchange.KLINE_INTERVAL_4HOUR, "4 hours ago UTC")
                             kline4HoursHi = float(kline4Hours[0][2])
                             kline4HoursLo = float(kline4Hours[0][3])
+                            bnb_tickers = bnb_exchange.get_orderbook_tickers()
+                            bnb_ticker = next(pair for pair in bnb_tickers if pair['symbol'] == trade['pair'])
                             break
                         except:
                             logger.info("Retrying...")
                             await asyncio.sleep(3)
                             continue
-                    bnb_tickers = bnb_exchange.get_orderbook_tickers()
-                    bnb_ticker = next(pair for pair in bnb_tickers if pair['symbol'] == trade['pair'])
                     bnb_sell_price = bnb_ticker['askPrice']
                     sell_price = ('%.8f' % float(bnb_sell_price)).rstrip('0').rstrip('.')
                     if float(bnb_sell_price) <= float(trade['buyprice']):
@@ -233,9 +233,9 @@ async def main():
                 if (
                     sim_trades > 0
                     and (
-                        (time.localtime()[3] % 4 == 3 and time.localtime()[4] >= 20)
+                        ((time.localtime()[3] - 2) % 4 == 3 and time.localtime()[4] >= 53)
                         or (
-                            (time.localtime()[3] % 4 == 0 and time.localtime()[4] >= 40)
+                            ((time.localtime()[3] - 2) % 4 == 0 and time.localtime()[4] >= 40)
                             or (time.localtime()[3] % 4 == 1 and time.localtime()[4] <= 30)
                         )
                     )
@@ -293,9 +293,9 @@ async def main():
                         if pair in usdt_tickers and pair not in excludedPairs:
                             for _ in range(5):
                                 try:
-                                    klines24Hours = bnb_exchange.get_historical_klines(pair, bnb_exchange.KLINE_INTERVAL_1HOUR, "24 hours ago UTC")
-                                    sorted24HKlines = sorted(klines24Hours, key=lambda k: float(k[3]), reverse=False)
-                                    lowest24HPrice = float(sorted24HKlines[0][3])
+                                    # klines24Hours = bnb_exchange.get_historical_klines(pair, bnb_exchange.KLINE_INTERVAL_1HOUR, "24 hours ago UTC")
+                                    # sorted24HKlines = sorted(klines24Hours, key=lambda k: float(k[3]), reverse=False)
+                                    # lowest24HPrice = float(sorted24HKlines[0][3])
                                     klines4Hours = bnb_exchange.get_historical_klines(pair, bnb_exchange.KLINE_INTERVAL_4HOUR, "12 hours ago UTC")
                                     if float(klines4Hours[0][4]) - float(klines4Hours[0][1]) < 0:
                                         beforePrev4HKline = 'negative'
@@ -309,12 +309,12 @@ async def main():
                                         this4HKline = 'negative'
                                     else:
                                         this4HKline = 'positive'
-                                    prev4HKlineClose = float(klines4Hours[0][4])
-                                    prev4HKlineLow = float(klines4Hours[0][3])
-                                    this4HKlineClose = float(klines4Hours[1][4])
+                                    prev4HKlineClose = float(klines4Hours[1][4])
+                                    prev4HKlineLow = float(klines4Hours[1][3])
+                                    this4HKlineClose = float(klines4Hours[2][4])
                                     break
                                 except:
-                                    logger.info("Retrying...")
+                                    logger.info(f"Retrying... ({pair})")
                                     await asyncio.sleep(3)
                                     continue
 
@@ -393,12 +393,12 @@ async def main():
 
                             logger.info(f"{pair} | Previous 4H Kline {str(prev4HKline)} | This 4H Kline {str(this4HKline)} | Previous 4H Kline Low {str(prev4HKlineLow)} | Previous 4H Bolinger Low Band {str(prev4HBolingerLowBand)} | Previous 4H RSI {str(prev4HRsi)} | This 4h RSI {str(this4HRsi)}")
                             if (
-                                time.localtime()[3] % 4 == 3
-                                and time.localtime()[4] >= 20
+                                (time.localtime()[3] - 2) % 4 == 3
+                                and time.localtime()[4] >= 53
                                 and prev4HKline == 'negative'
                                 and this4HKline == 'positive'
-                                and float(prev4HKlineLow) < float(prev4HBolingerLowBand) * 0.99
-                                and prev4HRsi < 35.0
+                                and float(prev4HKlineLow) < float(prev4HBolingerLowBand)
+                                and prev4HRsi < 30.0
                                 and this4HRsi >= prev4HRsi
                                 and sim_trades > 0
                             ):
@@ -419,19 +419,19 @@ async def main():
                                 bnb_ticker = next(item for item in bnb_tickers if item['symbol'] == pair)
                                 bnb_sell_price = bnb_ticker['askPrice']
                                 sell_price = ('%.8f' % float(bnb_sell_price)).rstrip('0').rstrip('.')
-                                expSellPrice = float(bnb_sell_price) * 1.0075
+                                expSellPrice = float(bnb_sell_price) * 1.0032
                                 stopLoss = float(bnb_sell_price) - ((expSellPrice - float(bnb_sell_price)) * 1.5)
                                 fExpSellPrice = ('%.8f' % expSellPrice).rstrip('0').rstrip('.')
                                 if config['sim_mode_on']:
                                     sim_trades -= 1
-                                    quantity = round((float(config['trade_amount']) / float(bnb_sell_price)) * (1.0 - float(config['binance_trade_fee'])), 2)
-                                    profit = round((float(quantity) * float(bnb_sell_price) * 1.0075 * (1.0 - float(config['binance_trade_fee'])) - config['trade_amount']), 2)
-                                    if float(bnb_sell_price) < float(lowest24HPrice):
-                                        lowest24HPrice = float(bnb_sell_price) * 0.98
+                                    quantity = round((float(config['trade_amount']) / float(bnb_sell_price)) * (1.0 - float(config['binance_trade_fee'])), 5)
+                                    profit = round((float(quantity) * float(bnb_sell_price) * 1.0032 * (1.0 - float(config['binance_trade_fee'])) - config['trade_amount']), 3)
+                                    # if float(bnb_sell_price) < float(lowest24HPrice):
+                                        # lowest24HPrice = float(bnb_sell_price) * 0.98
                                     trades.append({'pair': pair, 'type': 'sim', 'status': 'active', 'orderid': 0, 'expirytime': time.time() + 43200.0, 'buyprice': float(bnb_sell_price), 'expsellprice': expSellPrice, 'stoploss': stopLoss, 'quantity': quantity})
-                                    logger.info(f"<YATB SIM> [{pair}] Bought {str(config['trade_amount'])} @ {sell_price} = {str(quantity)}. Sell @ {fExpSellPrice}. Exp. Profit ~ {str(round(profit, 2))} USDT")
+                                    logger.info(f"<YATB SIM> [{pair}] Bought {str(config['trade_amount'])} @ {sell_price} = {str(quantity)}. Sell @ {fExpSellPrice}. Exp. Profit ~ {str(profit)} USDT")
                                     if config['telegram_notifications_on']:
-                                        telegram_bot_sendtext(config['telegram_bot_token'], config['telegram_user_id'], f"<YATB SIM> [{pair}] Bought {str(config['trade_amount'])} @ {sell_price} = {str(quantity)}. Sell @ {fExpSellPrice}. Exp. Profit ~ {str(round(profit, 2))} USDT")
+                                        telegram_bot_sendtext(config['telegram_bot_token'], config['telegram_user_id'], f"<YATB SIM> [{pair}] Bought {str(config['trade_amount'])} @ {sell_price} = {str(quantity)}. Sell @ {fExpSellPrice}. Exp. Profit ~ {str(profit)} USDT")
                                     simulation_balance = float(simulation_balance) - float(config['trade_amount'])
                                 else:
                                     # If available funds >= config['trade_ammount']
@@ -451,10 +451,13 @@ async def main():
                                         # then cancel Stop Loss order and sell at current price and move on
                                 break
                             elif (
-                                ((time.localtime()[3] % 4 == 0 and time.localtime()[4] >= 40) or (time.localtime()[3] % 4 == 1 and time.localtime()[4] <= 30))
+                                (((time.localtime()[3] - 2) % 4 == 0
+                                    and time.localtime()[4] >= 40)
+                                    or ((time.localtime()[3] - 2) % 4 == 1 and time.localtime()[4] <= 30)
+                                )
                                 and beforePrev4HKline == 'negative'
                                 and prev4HKline == 'positive'
-                                and float(prev4HKlineLow) < float(prev4HBolingerLowBand) * 0.99
+                                and float(prev4HKlineLow) < float(prev4HBolingerLowBand)
                                 and prev4HRsi < this4HRsi
                                 and sim_trades > 0
                             ):
@@ -465,15 +468,15 @@ async def main():
                                 bnb_ticker = next(item for item in bnb_tickers if item['symbol'] == pair)
                                 bnb_sell_price = bnb_ticker['askPrice']
                                 sell_price = ('%.8f' % float(bnb_sell_price)).rstrip('0').rstrip('.')
-                                expSellPrice = float(bnb_sell_price) * 1.0042
+                                expSellPrice = float(bnb_sell_price) * 1.0032
                                 stopLoss = float(bnb_sell_price) - ((expSellPrice - float(bnb_sell_price)) * 1.5)
                                 fExpSellPrice = ('%.8f' % expSellPrice).rstrip('0').rstrip('.')
                                 if config['sim_mode_on']:
                                     sim_trades -= 1
                                     quantity = round((float(config['trade_amount']) / float(bnb_sell_price)) * (1.0 - float(config['binance_trade_fee'])), 2)
-                                    profit = round((float(quantity) * float(bnb_sell_price) * 1.0042 * (1.0 - float(config['binance_trade_fee'])) - config['trade_amount']), 2)
-                                    if float(bnb_sell_price) < float(lowest24HPrice):
-                                        lowest24HPrice = float(bnb_sell_price) * 0.98
+                                    profit = round((float(quantity) * float(bnb_sell_price) * 1.0032 * (1.0 - float(config['binance_trade_fee'])) - config['trade_amount']), 2)
+                                    # if float(bnb_sell_price) < float(lowest24HPrice):
+                                        # lowest24HPrice = float(bnb_sell_price) * 0.98
                                     trades.append({'pair': pair, 'type': 'sim', 'status': 'active', 'orderid': 0, 'expirytime': time.time() + 43200.0, 'buyprice': float(bnb_sell_price), 'expsellprice': expSellPrice, 'stoploss': stopLoss, 'quantity': quantity})
                                     logger.info(f"<YATB SIM> [{pair}] Bought {str(config['trade_amount'])} @ {sell_price} = {str(quantity)}. Sell @ {fExpSellPrice}. Exp. Profit ~ {str(round(profit, 2))} USDT")
                                     if config['telegram_notifications_on']:

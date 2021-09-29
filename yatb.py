@@ -132,90 +132,36 @@ async def main():
                             continue
                     bnb_sell_price = bnb_ticker['askPrice']
                     sell_price = ('%.8f' % float(bnb_sell_price)).rstrip('0').rstrip('.')
-                    if float(bnb_sell_price) <= float(trade['buyprice']):
-                        # Too bad, price drop below set limits, let's sell for security
+                    if kline4HoursHi >= float(trade['expsellprice']) and time.time() - trade['time'] > 600:
+                        # Success!
                         trade['status'] = 'remove'
-                        actual_volume = float(bnb_sell_price) * float(trade['quantity']) * (1.0 - float(config['binance_trade_fee']))
-                        loss = float(config['trade_amount']) - float(actual_volume)
-                        logger.info(f"<YATB> [{trade['pair']}] Stop Loss got executed :( You have lost {str(round(float(loss), 2))} USDT")
-                        if config['telegram_notifications_on']:
-                            telegram_bot_sendtext(config['telegram_bot_token'], config['telegram_user_id'], f"<YATB> [{trade['pair']}] Stop Loss got executed :( You have lost {str(round(float(loss), 2))} USDT")
-                        simulation_balance = float(simulation_balance) + float(actual_volume)
-                        # Update google sheet
-                        for _ in range(5):
-                            try:
-                                update_google_sheet(config['sheet_id'], config['range_name'], round(simulation_balance, 2), 0)
-                                break
-                            except:
-                                await asyncio.sleep(5)
-                                continue
-                        for _ in range(5):
-                            try:
-                                update_sheet_trades_result(config['sheet_id'], "stoploss")
-                                break
-                            except:
-                                await asyncio.sleep(5)
-                                continue
-                    elif float(bnb_sell_price) >= float(trade['expsellprice']):
-                        # Great! Take profit!
-                        # 1. TBD First cancel Stop Loss
-                        trade['status'] = 'remove'
+                        trade['result'] = 'successful'
                         actual_volume = float(trade['expsellprice']) * float(trade['quantity']) * (1.0 - float(config['binance_trade_fee']))
+                    if trade['status'] == 'remove':
                         profit = float(actual_volume) - float(config['trade_amount'])
-                        logger.info(f"<YATB> [{trade['pair']}] Trade successful! You have won {str(round(float(profit), 2))} USDT")
+                        result_text = "won" if profit > 0 else "lost"
+                        logger.info(f"<YATB> [{trade['pair']}] ({trade['result'].upper()}) You have {result_text} {str(round(float(profit), 2))} USDT")
                         if config['telegram_notifications_on']:
-                            telegram_bot_sendtext(config['telegram_bot_token'], config['telegram_user_id'], f"<YATB> [{trade['pair']}] Trade successful! You have won {str(round(float(profit), 2))} USDT")
-                        simulation_balance = float(simulation_balance) + float(actual_volume)
-                        # Update google sheet
-                        for _ in range(5):
-                            try:
-                                update_google_sheet(config['sheet_id'], config['range_name'], round(simulation_balance, 2), 0)
-                                break
-                            except:
-                                await asyncio.sleep(5)
-                                continue
-                        for _ in range(5):
-                            try:
-                                update_sheet_trades_result(config['sheet_id'], "successful")
-                                break
-                            except:
-                                await asyncio.sleep(5)
-                                continue
-                    elif time.time() > trade['expirytime']:
-                        # Not so great
-                        # 1. TBD Cancel Stop Loss
-                        # Sell @ current price
-                        trade['status'] = 'remove'
-                        actual_volume = float(bnb_sell_price) * float(trade['quantity']) * (1.0 - float(config['binance_trade_fee']))
-                        if float(actual_volume) < float(config['trade_amount']):
-                            loss = float(config['trade_amount']) - float(actual_volume)
-                            logger.info(f"<YATB> [{trade['pair']}] Trade out of time: Sold @ {sell_price}. You have lost {str(round(float(loss), 2))} USDT")
-                            if config['telegram_notifications_on']:
-                                telegram_bot_sendtext(config['telegram_bot_token'], config['telegram_user_id'], f"<YATB> [{trade['pair']}] Trade out of time: Sold @ {sell_price}. You have lost {str(round(float(loss), 2))} USDT")
-                        else:
-                            profit = float(actual_volume) - float(config['trade_amount'])
-                            logger.info(f"<YATB> [{trade['pair']}] Trade out of time: Sold @ {sell_price}. You have won {str(round(float(profit), 2))} USDT")
-                            if config['telegram_notifications_on']:
-                                telegram_bot_sendtext(config['telegram_bot_token'], config['telegram_user_id'], f"<YATB> [{trade['pair']}] Trade out of time: Sold @ {sell_price}. You have won {str(round(float(profit), 2))} USDT")
-                        simulation_balance = float(simulation_balance) + float(actual_volume)
-                        # Update google sheet
-                        for _ in range(5):
-                            try:
-                                update_google_sheet(config['sheet_id'], config['range_name'], round(simulation_balance, 2), 0)
-                                break
-                            except:
-                                await asyncio.sleep(5)
-                                continue
-                        for _ in range(5):
-                            try:
-                                update_sheet_trades_result(config['sheet_id'], "unsuccessful")
-                                break
-                            except:
-                                await asyncio.sleep(5)
-                                continue
+                            telegram_bot_sendtext(config['telegram_bot_token'], config['telegram_user_id'], f"<YATB> [{trade['pair']}] ({trade['result'].upper()}) You have {result_text} {str(round(float(profit), 2))} USDT")
+                            simulation_balance = float(simulation_balance) + float(actual_volume)
+                            # Update google sheet
+                            for _ in range(5):
+                                try:
+                                    update_google_sheet(config['sheet_id'], config['range_name'], round(simulation_balance, 2), 0)
+                                    break
+                                except:
+                                    await asyncio.sleep(5)
+                                    continue
+                                    for _ in range(5):
+                                        try:
+                                            update_sheet_trades_result(config['sheet_id'], trade['result'])
+                                            break
+                                        except:
+                                            await asyncio.sleep(5)
+                                            continue
                     else:
                         # Current trade is still valid
-                        logger.info(f"<YATB> [{trade['pair']}] Trade still valid:")
+                        logger.info(f"<YATB> [{trade['pair']}] Trade ongoing:")
                         print(trade)
 
                 # Remove old trade items
@@ -428,7 +374,7 @@ async def main():
                                     profit = round((float(quantity) * float(bnb_sell_price) * 1.0032 * (1.0 - float(config['binance_trade_fee'])) - config['trade_amount']), 3)
                                     # if float(bnb_sell_price) < float(lowest24HPrice):
                                         # lowest24HPrice = float(bnb_sell_price) * 0.98
-                                    trades.append({'pair': pair, 'type': 'sim', 'status': 'active', 'orderid': 0, 'expirytime': time.time() + 43200.0, 'buyprice': float(bnb_sell_price), 'expsellprice': expSellPrice, 'stoploss': stopLoss, 'quantity': quantity})
+                                    trades.append({'pair': pair, 'type': 'sim', 'status': 'active', 'orderid': 0, 'time': time.time(), 'expirytime': time.time() + 43200.0, 'buyprice': float(bnb_sell_price), 'expsellprice': expSellPrice, 'stoploss': stopLoss, 'quantity': quantity})
                                     logger.info(f"<YATB SIM> [{pair}] Bought {str(config['trade_amount'])} @ {sell_price} = {str(quantity)}. Sell @ {fExpSellPrice}. Exp. Profit ~ {str(profit)} USDT")
                                     if config['telegram_notifications_on']:
                                         telegram_bot_sendtext(config['telegram_bot_token'], config['telegram_user_id'], f"<YATB SIM> [{pair}] Bought {str(config['trade_amount'])} @ {sell_price} = {str(quantity)}. Sell @ {fExpSellPrice}. Exp. Profit ~ {str(profit)} USDT")
@@ -477,7 +423,7 @@ async def main():
                                     profit = round((float(quantity) * float(bnb_sell_price) * 1.0032 * (1.0 - float(config['binance_trade_fee'])) - config['trade_amount']), 2)
                                     # if float(bnb_sell_price) < float(lowest24HPrice):
                                         # lowest24HPrice = float(bnb_sell_price) * 0.98
-                                    trades.append({'pair': pair, 'type': 'sim', 'status': 'active', 'orderid': 0, 'expirytime': time.time() + 43200.0, 'buyprice': float(bnb_sell_price), 'expsellprice': expSellPrice, 'stoploss': stopLoss, 'quantity': quantity})
+                                    trades.append({'pair': pair, 'type': 'sim', 'status': 'active', 'orderid': 0, 'time': time.time(), 'expirytime': time.time() + 43200.0, 'buyprice': float(bnb_sell_price), 'expsellprice': expSellPrice, 'stoploss': stopLoss, 'quantity': quantity})
                                     logger.info(f"<YATB SIM> [{pair}] Bought {str(config['trade_amount'])} @ {sell_price} = {str(quantity)}. Sell @ {fExpSellPrice}. Exp. Profit ~ {str(round(profit, 2))} USDT")
                                     if config['telegram_notifications_on']:
                                         telegram_bot_sendtext(config['telegram_bot_token'], config['telegram_user_id'], f"<YATB SIM> [{pair}] Bought {str(config['trade_amount'])} @ {sell_price} = {str(quantity)}. Sell @ {fExpSellPrice}. Exp. Profit ~ {str(round(profit, 2))} USDT")

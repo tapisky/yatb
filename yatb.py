@@ -380,7 +380,7 @@ async def main():
                                 or (
                                     ((time.localtime()[3] - 2) % 4 == 3
                                     and time.localtime()[4] >= 53
-                                    prevStochFFastK < prevStochFFastD
+                                    and prevStochFFastK < prevStochFFastD
                                     and thisStochFFastK > thisStochFFastD
                                     and thisStochFFastK > 75.0
                                     and thisStochFFastK < 99.0

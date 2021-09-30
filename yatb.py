@@ -179,10 +179,10 @@ async def main():
                 if (
                     sim_trades > 0
                     and (
-                        ((time.localtime()[3] - 2) % 4 == 3 and time.localtime()[4] >= 53)
+                        (time.gmtime()[3] % 4 == 3 and time.gmtime()[4] >= 52)
                         or (
-                            ((time.localtime()[3] - 2) % 4 == 0 and time.localtime()[4] >= 40)
-                            or (time.localtime()[3] % 4 == 1 and time.localtime()[4] <= 30)
+                            (time.gmtime()[3] % 4 == 0 and time.gmtime()[4] >= 30)
+                            or (time.gmtime()[3] % 4 == 1 and time.gmtime()[4] <= 30)
                         )
                     )
                 ):
@@ -360,16 +360,16 @@ async def main():
 
                             logger.info(f"{pair} | Prev Kline {str(prev4HKline)} | This Kline {str(this4HKline)} | Prev Kline Low {str(prev4HKlineLow)} | Prev RSI {str(prev4HRsi)} | This RSI {str(this4HRsi)} | Prev StochF K,D {str(prevStochFFastK)}|{str(prevStochFFastD)} | This StochF K,D {str(thisStochFFastK)}|{str(thisStochFFastD)}")
                             if (
-                                ((time.localtime()[3] - 2) % 4 == 3
-                                and time.localtime()[4] >= 53
+                                (time.gmtime()[3] % 4 == 3
+                                and time.gmtime()[4] >= 53
                                 and this4HKline == 'negative'
                                 and float(this4HKlineClose) < float(this4HBolingerLowBand)
                                 and this4HRsi < 35.0
                                 and sim_trades > 0)
                                 or (
-                                    (((time.localtime()[3] - 2) % 4 == 0
-                                        and time.localtime()[4] >= 40)
-                                        or ((time.localtime()[3] - 2) % 4 == 1 and time.localtime()[4] <= 30)
+                                    ((time.gmtime()[3] % 4 == 0
+                                        and time.gmtime()[4] >= 30)
+                                        or (time.gmtime()[3] % 4 == 1 and time.gmtime()[4] <= 30)
                                     )
                                     and beforePrev4HKline == 'negative'
                                     and prev4HKline == 'positive'
@@ -378,8 +378,8 @@ async def main():
                                     and sim_trades > 0
                                 )
                                 or (
-                                    ((time.localtime()[3] - 2) % 4 == 3
-                                    and time.localtime()[4] >= 53
+                                    (time.gmtime()[3] % 4 == 3
+                                    and time.gmtime()[4] >= 53
                                     and prevStochFFastK < prevStochFFastD
                                     and thisStochFFastK > thisStochFFastD
                                     and thisStochFFastK > 75.0

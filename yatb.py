@@ -237,6 +237,35 @@ async def main():
                         pair = item['symbol'] + "USDT"
                         opps = []
                         if pair in usdt_tickers and pair not in excludedPairs:
+
+                            # Initialize variables
+                            prev4HKlineClose = None
+                            prev4HKlineLow = None
+                            this4HKlineClose = None
+                            this4HKlineLow = None
+                            prev4HRsi = None
+                            this4HRsi = None
+                            prev4HBolingerLowBand = None
+                            this4HBolingerLowBand = None
+                            this4HBolingerMidBand = None
+                            prevStochFFastK = None
+                            prevStochFFastD = None
+                            thisStochFFastK = None
+                            thisStochFFastD = None
+                            del prev4HKlineClose
+                            del prev4HKlineLow
+                            del this4HKlineClose
+                            del this4HKlineLow
+                            del prev4HRsi
+                            del this4HRsi
+                            del prev4HBolingerLowBand
+                            del this4HBolingerLowBand
+                            del this4HBolingerMidBand
+                            del prevStochFFastK
+                            del prevStochFFastD
+                            del thisStochFFastK
+                            del thisStochFFastD
+
                             for _ in range(5):
                                 try:
                                     # klines24Hours = bnb_exchange.get_historical_klines(pair, bnb_exchange.KLINE_INTERVAL_1HOUR, "24 hours ago UTC")
@@ -358,7 +387,7 @@ async def main():
                                     continue
 
                             try:
-                                logger.info(f"{pair} | Prev Kline {str(prev4HKline)} | This Kline {str(this4HKline)} | Prev Kline Low {str(prev4HKlineLow)} | Prev RSI {str(prev4HRsi)} | This RSI {str(this4HRsi)} | Prev StochF K,D {str(prevStochFFastK)}|{str(prevStochFFastD)} | This StochF K,D {str(thisStochFFastK)}|{str(thisStochFFastD)}")
+                                logger.info(f"{pair} | Prev Kline {str(prev4HKline)} | This Kline {str(this4HKline)} | Prev Kline Low {str(prev4HKlineLow)} | Prev Lower Bolinger {str(prev4HBolingerLowBand)} | Prev RSI {str(round(prev4HRsi, 2))} | This RSI {str(round(this4HRsi, 2))} | Prev StochF K,D {str(round(prevStochFFastK, 2))}|{str(round(prevStochFFastD, 2))} | This StochF K,D {str(round(thisStochFFastK, 2))}|{str(round(thisStochFFastD, 2))}")
                                 if (
                                     (time.gmtime()[3] % 4 == 3
                                     and time.gmtime()[4] >= 53

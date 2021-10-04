@@ -382,7 +382,7 @@ async def main():
                                     this4HRsi = float(result['data'][1]['result']['value'])
                                     prev4HBolingerLowBand = float(result['data'][2]['result']['valueLowerBand'])
                                     this4HBolingerLowBand = float(result['data'][3]['result']['valueLowerBand'])
-                                    this4HBolingerMidBand = float(result['data'][2]['result']['valueMiddleBand'])
+                                    this4HBolingerMidBand = float(result['data'][3]['result']['valueMiddleBand'])
                                     prevStochFFastK = float(result['data'][4]['result']['valueFastK'])
                                     prevStochFFastD = float(result['data'][4]['result']['valueFastD'])
                                     thisStochFFastK = float(result['data'][5]['result']['valueFastK'])
@@ -419,15 +419,17 @@ async def main():
                                     and this4HRsi < 35.0
                                     and this4HBtcRsi < 69.0
                                     and sim_trades > 0)
-                                    or (
-                                        ((time.gmtime()[3] % 4 == 0
-                                            and time.gmtime()[4] >= 30)
-                                            or (time.gmtime()[3] % 4 == 1 and time.gmtime()[4] <= 30)
-                                        )
-                                        and beforePrev4HKline == 'negative'
-                                        and prev4HKline == 'positive'
-                                        and float(prev4HKlineLow) < float(prev4HBolingerLowBand)
-                                        and prev4HRsi < this4HRsi
+                                    # or (
+                                    #     ((time.gmtime()[3] % 4 == 0
+                                    #         and time.gmtime()[4] >= 30)
+                                    #         or (time.gmtime()[3] % 4 == 1 and time.gmtime()[4] <= 30)
+                                    #     )
+                                    or (time.gmtime()[3] % 4 == 3
+                                        and time.gmtime()[4] >= 54
+                                        and prev4HKline == 'negative'
+                                        and this4HKline == 'positive'
+                                        and float(this4HKlineLow) < float(this4HBolingerLowBand)
+                                        and float(this4HKlineClose) < float(this4HBolingerMidBand)
                                         and this4HBtcRsi < 69.0
                                         and sim_trades > 0
                                     )

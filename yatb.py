@@ -179,7 +179,7 @@ async def main():
                 if (
                     sim_trades > 0
                     and (
-                        (time.gmtime()[3] % 4 == 3 and time.gmtime()[4] >= 52)
+                        (time.gmtime()[3] % 4 == 3 and time.gmtime()[4] >= 53)
                         or (
                             (time.gmtime()[3] % 4 == 0 and time.gmtime()[4] >= 30)
                             or (time.gmtime()[3] % 4 == 1 and time.gmtime()[4] <= 30)
@@ -231,6 +231,29 @@ async def main():
                     #                     'percent_change_60d': 140.49810357, 'percent_change_90d': 63.96213584, 'market_cap': 1211306837.230653,
                     #                     'market_cap_dominance': 0.0594, 'fully_diluted_market_cap': 2672386356.4197516, 'last_updated': '2021-08-27T12:56:38.000Z'}}}
                     logger.info("Calculating current opportunities...")
+
+                    this4HBtcRsi = None
+                    del this4HBtcRsi
+                    # First, get current 4h RSI for bitcoin
+                    # Get technical info
+                    endpoint = "https://api.taapi.io/rsi"
+
+                    # Define a JSON body with parameters to be sent to the API
+                    parameters = {
+                        'secret': config['taapi_api_key'],
+                        'exchange': 'binance',
+                        'symbol': 'BTC/USDT',
+                        'interval': '4h'
+                    }
+                    for _ in range(5):
+                        try:
+                            response = requests.get(url = endpoint, params = parameters)
+                            result = response.json()
+                            this4HBtcRsi = result['value']
+                        except:
+                            logger.info(f"Retrying... (Getting BTCUSDT 4H RSI)")
+                            await asyncio.sleep(3)
+                            continue
 
                     # Idea -> prepare opps array with klines and TA analysis info and sort it by prev4HRsi ascending
                     for item in sortedTargets:
@@ -387,10 +410,10 @@ async def main():
                                     continue
 
                             try:
-                                logger.info(f"{pair} | Prev Kline {str(prev4HKline)} | This Kline {str(this4HKline)} | Prev Kline Low {str(prev4HKlineLow)} | Prev Lower Bolinger {str(prev4HBolingerLowBand)} | Prev RSI {str(round(prev4HRsi, 2))} | This RSI {str(round(this4HRsi, 2))} | Prev StochF K,D {str(round(prevStochFFastK, 2))}|{str(round(prevStochFFastD, 2))} | This StochF K,D {str(round(thisStochFFastK, 2))}|{str(round(thisStochFFastD, 2))}")
+                                logger.info(f"{pair} | Prev Kline {str(prev4HKline)} | This Kline {str(this4HKline)} | Prev Kline Low {str(prev4HKlineLow)} | Prev Lower Bolinger {str(prev4HBolingerLowBand)} | Prev RSI {str(round(prev4HRsi, 2))} | This RSI {str(round(this4HRsi, 2))} | BTCUSDT RSI {str(round(this4HBtcRsi,2))} | Prev StochF K,D {str(round(prevStochFFastK, 2))}|{str(round(prevStochFFastD, 2))} | This StochF K,D {str(round(thisStochFFastK, 2))}|{str(round(thisStochFFastD, 2))}")
                                 if (
                                     (time.gmtime()[3] % 4 == 3
-                                    and time.gmtime()[4] >= 53
+                                    and time.gmtime()[4] >= 54
                                     and this4HKline == 'negative'
                                     and float(this4HKlineClose) < float(this4HBolingerLowBand)
                                     and this4HRsi < 35.0
@@ -408,13 +431,14 @@ async def main():
                                     )
                                     or (
                                         (time.gmtime()[3] % 4 == 3
-                                        and time.gmtime()[4] >= 53
+                                        and time.gmtime()[4] >= 54
                                         and prevStochFFastK < prevStochFFastD
                                         and thisStochFFastK > thisStochFFastD
                                         and thisStochFFastK > 75.0
                                         and thisStochFFastK < 99.0
                                         and thisStochFFastK - thisStochFFastD > (thisStochFFastK * 0.275)
                                         and this4HRsi < 61.0
+                                        and this4HBtcRsi < 69.0
                                         and sim_trades > 0)
                                     )
                                 ):

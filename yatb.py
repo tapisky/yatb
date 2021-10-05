@@ -210,7 +210,7 @@ async def main():
                     session = Session()
                     session.headers.update(headers)
 
-                    for _ in range(20):
+                    for _ in range(5):
                         try:
                             response = session.get(url, params=parameters)
                             data = json.loads(response.text)
@@ -253,6 +253,7 @@ async def main():
                             response = requests.get(url = endpoint, params = parameters)
                             result = response.json()
                             this4HBtcRsi = result['value']
+                            break
                         except:
                             logger.info(f"Retrying... (Getting BTCUSDT 4H RSI)")
                             await asyncio.sleep(4)
@@ -398,7 +399,7 @@ async def main():
                                         prev4HStochFFastD = float(result['data'][4]['result']['valueFastD'])
                                         this4HStochFFastK = float(result['data'][5]['result']['valueFastK'])
                                         this4HStochFFastD = float(result['data'][5]['result']['valueFastD'])
-                                        await asyncio.sleep(4)
+                                        await asyncio.sleep(3)
                                         break
 
                                         # rsi = result['data'][0]['result']['value']
@@ -424,7 +425,7 @@ async def main():
                             # Define a JSON body with parameters to be sent to the API
                             taapiSymbol = pair.split('USDT')[0] + "/" + "USDT"
                             endpoint = "https://api.taapi.io/bulk"
-                            
+
                             parameters = {
                                 "secret": config['taapi_api_key'],
                                 "construct": {
@@ -463,13 +464,13 @@ async def main():
                                     break
                                 except:
                                     logger.info(f"{pair} | TAAPI Response (2H): {response.reason}. Trying again...")
-                                    await asyncio.sleep(4)
+                                    await asyncio.sleep(3)
                                     continue
 
                             try:
                                 if time.gmtime()[3] % 4 == 3 and time.gmtime()[4] >= 53:
                                     logger.info(f"4H Data: {pair} | Prev Kline {str(prev4HKline)} | This Kline {str(this4HKline)} | Prev Kline Low {str(prev4HKlineLow)} | Prev Lower Bolinger {str(prev4HBolingerLowBand)} | Prev RSI {str(round(prev4HRsi, 2))} | This RSI {str(round(this4HRsi, 2))} | BTCUSDT RSI {str(round(this4HBtcRsi,2))} | Prev StochF K,D {str(round(prev4HStochFFastK, 2))}|{str(round(prev4HStochFFastD, 2))} | This StochF K,D {str(round(this4HStochFFastK, 2))}|{str(round(this4HStochFFastD, 2))}")
-                                logger.info(f"2H Data: {pair} | This RSI {str(round(this2HRsi, 2))} | This StochF K,D {str(round(this4HStochFFastK, 2))}|{str(round(this4HStochFFastD, 2))}")
+                                logger.info(f"2H Data: {pair} | This RSI {str(round(this2HRsi, 2))} | This StochF K,D {str(round(this2HStochFFastK, 2))}|{str(round(this2HStochFFastD, 2))}")
                                 if (
                                     (time.gmtime()[3] % 4 == 3
                                     and time.gmtime()[4] >= 54
@@ -667,7 +668,10 @@ async def main():
                             # if (config['sim_mode_on'] and sim_trades == 0) or (not config['sim_mode_on'] and float(bnb_currency_available) < float(config['trade_amount'])):
                             #     break
                             except:
+                                logger.info(traceback.format_exc())
                                 logger.info(f"Problem with pair {pair}")
+                    logger.info("2H opps ==========>")
+                    logger.info(twoHOpps)
                     # Try 2H opps if there are trades available
                     for pair in twoHOpps:
                         if sim_trades > 0:

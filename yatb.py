@@ -422,6 +422,7 @@ async def main():
                                 # end if time.gmtime()[3] % 4 == 3 and time.gmtime()[4] >= 53
                             # Get 2H indicators
                             # Define a JSON body with parameters to be sent to the API
+                            taapiSymbol = pair.split('USDT')[0] + "/" + "USDT"
                             parameters = {
                                 "secret": config['taapi_api_key'],
                                 "construct": {

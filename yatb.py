@@ -423,6 +423,8 @@ async def main():
                             # Get 2H indicators
                             # Define a JSON body with parameters to be sent to the API
                             taapiSymbol = pair.split('USDT')[0] + "/" + "USDT"
+                            endpoint = "https://api.taapi.io/bulk"
+                            
                             parameters = {
                                 "secret": config['taapi_api_key'],
                                 "construct": {

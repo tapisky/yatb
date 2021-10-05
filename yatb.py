@@ -197,7 +197,7 @@ async def main():
                     url = 'https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest'
                     parameters = {
                         'start':'1',
-                        'limit':'200',
+                        'limit':'35',
                         'convert':'USDT',
                         'market_cap_min': 2000000000,
                         'volume_24h_min': 35000000
@@ -255,7 +255,7 @@ async def main():
                             this4HBtcRsi = result['value']
                         except:
                             logger.info(f"Retrying... (Getting BTCUSDT 4H RSI)")
-                            await asyncio.sleep(3)
+                            await asyncio.sleep(4)
                             continue
 
                     # Idea -> prepare opps array with klines and TA analysis info and sort it by prev4HRsi ascending
@@ -398,7 +398,7 @@ async def main():
                                         prev4HStochFFastD = float(result['data'][4]['result']['valueFastD'])
                                         this4HStochFFastK = float(result['data'][5]['result']['valueFastK'])
                                         this4HStochFFastD = float(result['data'][5]['result']['valueFastD'])
-                                        await asyncio.sleep(3)
+                                        await asyncio.sleep(4)
                                         break
 
                                         # rsi = result['data'][0]['result']['value']
@@ -416,8 +416,8 @@ async def main():
                                         #     'cv_blb_ratio': float(item['quote']['USDT']['price']) / float(bLBand)
                                         # })
                                     except:
-                                        logger.info(f"{pair} | TAAPI Response (4H): {response.reason}. Trying again in 2 seconds...")
-                                        await asyncio.sleep(2)
+                                        logger.info(f"{pair} | TAAPI Response (4H): {response.reason}. Trying again...")
+                                        await asyncio.sleep(5)
                                         continue
                                 # end if time.gmtime()[3] % 4 == 3 and time.gmtime()[4] >= 53
                             # Get 2H indicators
@@ -459,8 +459,8 @@ async def main():
                                     await asyncio.sleep(3)
                                     break
                                 except:
-                                    logger.info(f"{pair} | TAAPI Response (2H): {response.reason}. Trying again in 2 seconds...")
-                                    await asyncio.sleep(2)
+                                    logger.info(f"{pair} | TAAPI Response (2H): {response.reason}. Trying again...")
+                                    await asyncio.sleep(4)
                                     continue
 
                             try:

@@ -123,6 +123,9 @@ async def main():
                             kline4Hours = bnb_exchange.get_historical_klines(trade['pair'], bnb_exchange.KLINE_INTERVAL_4HOUR, "4 hours ago UTC")
                             kline4HoursHi = float(kline4Hours[0][2])
                             kline4HoursLo = float(kline4Hours[0][3])
+                            kline2Hours = bnb_exchange.get_historical_klines(trade['pair'], bnb_exchange.KLINE_INTERVAL_2HOUR, "2 hours ago UTC")
+                            kline2HoursHi = float(kline2Hours[0][2])
+                            kline2HoursLo = float(kline4Hours[0][3])
                             bnb_tickers = bnb_exchange.get_orderbook_tickers()
                             bnb_ticker = next(pair for pair in bnb_tickers if pair['symbol'] == trade['pair'])
                             break
@@ -132,7 +135,11 @@ async def main():
                             continue
                     bnb_sell_price = bnb_ticker['askPrice']
                     sell_price = ('%.8f' % float(bnb_sell_price)).rstrip('0').rstrip('.')
-                    if kline4HoursHi >= float(trade['expsellprice']) and time.time() - trade['time'] > 600:
+                    if trade['interval'] == '4H':
+                        klineHi = kline4HoursHi
+                    else:
+                        klineHi = kline2HoursHi
+                    if klineHi >= float(trade['expsellprice']) and time.time() - trade['time'] > 600:
                         # Success!
                         trade['status'] = 'remove'
                         trade['result'] = 'successful'
@@ -178,13 +185,9 @@ async def main():
                 # Check if there are available trades and if the time to check markets is correct
                 if (
                     sim_trades > 0
-                    and (
-                        (time.gmtime()[3] % 4 == 3 and time.gmtime()[4] >= 53)
-                        or (
-                            (time.gmtime()[3] % 4 == 0 and time.gmtime()[4] >= 30)
-                            or (time.gmtime()[3] % 4 == 1 and time.gmtime()[4] <= 30)
+                    and ((time.gmtime()[3] % 4 == 3 and time.gmtime()[4] >= 53)
+                        or (time.gmtime()[3] % 2 == 1 and time.gmtime()[4] >= 53)
                         )
-                    )
                 ):
 
                     # Check good opportunities to buy
@@ -258,7 +261,7 @@ async def main():
                     # Idea -> prepare opps array with klines and TA analysis info and sort it by prev4HRsi ascending
                     for item in sortedTargets:
                         pair = item['symbol'] + "USDT"
-                        opps = []
+                        twoHOpps = []
                         if pair in usdt_tickers and pair not in excludedPairs:
 
                             # Initialize variables
@@ -271,10 +274,13 @@ async def main():
                             prev4HBolingerLowBand = None
                             this4HBolingerLowBand = None
                             this4HBolingerMidBand = None
-                            prevStochFFastK = None
-                            prevStochFFastD = None
-                            thisStochFFastK = None
-                            thisStochFFastD = None
+                            prev4HStochFFastK = None
+                            prev4HStochFFastD = None
+                            this4HStochFFastK = None
+                            this4HStochFFastD = None
+                            this2HRsi = None
+                            this2HStochFFastK = None
+                            this2HStochFFastD = None
                             del prev4HKlineClose
                             del prev4HKlineLow
                             del this4HKlineClose
@@ -284,80 +290,149 @@ async def main():
                             del prev4HBolingerLowBand
                             del this4HBolingerLowBand
                             del this4HBolingerMidBand
-                            del prevStochFFastK
-                            del prevStochFFastD
-                            del thisStochFFastK
-                            del thisStochFFastD
+                            del prev4HStochFFastK
+                            del prev4HStochFFastD
+                            del this4HStochFFastK
+                            del this4HStochFFastD
+                            del this2HRsi
+                            del this2HStochFFastK
+                            del this2HStochFFastD
 
-                            for _ in range(5):
-                                try:
-                                    # klines24Hours = bnb_exchange.get_historical_klines(pair, bnb_exchange.KLINE_INTERVAL_1HOUR, "24 hours ago UTC")
-                                    # sorted24HKlines = sorted(klines24Hours, key=lambda k: float(k[3]), reverse=False)
-                                    # lowest24HPrice = float(sorted24HKlines[0][3])
-                                    klines4Hours = bnb_exchange.get_historical_klines(pair, bnb_exchange.KLINE_INTERVAL_4HOUR, "12 hours ago UTC")
-                                    if float(klines4Hours[0][4]) - float(klines4Hours[0][1]) < 0:
-                                        beforePrev4HKline = 'negative'
-                                    else:
-                                        beforePrev4HKline = 'positive'
-                                    if float(klines4Hours[1][4]) - float(klines4Hours[1][1]) < 0:
-                                        prev4HKline = 'negative'
-                                    else:
-                                        prev4HKline = 'positive'
-                                    if float(klines4Hours[2][4]) - float(klines4Hours[2][1]) < 0:
-                                        this4HKline = 'negative'
-                                    else:
-                                        this4HKline = 'positive'
-                                    prev4HKlineClose = float(klines4Hours[1][4])
-                                    prev4HKlineLow = float(klines4Hours[1][3])
-                                    this4HKlineClose = float(klines4Hours[2][4])
-                                    this4HKlineLow = float(klines4Hours[2][3])
-                                    break
-                                except:
-                                    logger.info(f"Retrying... ({pair})")
-                                    await asyncio.sleep(3)
-                                    continue
+                            if time.gmtime()[3] % 4 == 3 and time.gmtime()[4] >= 53:
+                                for _ in range(5):
+                                    try:
+                                        # klines24Hours = bnb_exchange.get_historical_klines(pair, bnb_exchange.KLINE_INTERVAL_1HOUR, "24 hours ago UTC")
+                                        # sorted24HKlines = sorted(klines24Hours, key=lambda k: float(k[3]), reverse=False)
+                                        # lowest24HPrice = float(sorted24HKlines[0][3])
+                                        klines4Hours = bnb_exchange.get_historical_klines(pair, bnb_exchange.KLINE_INTERVAL_4HOUR, "12 hours ago UTC")
+                                        if float(klines4Hours[0][4]) - float(klines4Hours[0][1]) < 0:
+                                            beforePrev4HKline = 'negative'
+                                        else:
+                                            beforePrev4HKline = 'positive'
+                                        if float(klines4Hours[1][4]) - float(klines4Hours[1][1]) < 0:
+                                            prev4HKline = 'negative'
+                                        else:
+                                            prev4HKline = 'positive'
+                                        if float(klines4Hours[2][4]) - float(klines4Hours[2][1]) < 0:
+                                            this4HKline = 'negative'
+                                        else:
+                                            this4HKline = 'positive'
+                                        prev4HKlineClose = float(klines4Hours[1][4])
+                                        prev4HKlineLow = float(klines4Hours[1][3])
+                                        this4HKlineClose = float(klines4Hours[2][4])
+                                        this4HKlineLow = float(klines4Hours[2][3])
+                                        break
+                                    except:
+                                        logger.info(f"Retrying... ({pair})")
+                                        await asyncio.sleep(3)
+                                        continue
 
-                            # Get technical info
-                            taapiSymbol = pair.split('USDT')[0] + "/" + "USDT"
-                            endpoint = "https://api.taapi.io/bulk"
+                                # Get technical info
+                                taapiSymbol = pair.split('USDT')[0] + "/" + "USDT"
+                                endpoint = "https://api.taapi.io/bulk"
 
+                                # Get 4H indicators
+                                # Define a JSON body with parameters to be sent to the API
+                                parameters = {
+                                    "secret": config['taapi_api_key'],
+                                    "construct": {
+                                        "exchange": "binance",
+                                        "symbol": taapiSymbol,
+                                        "interval": "4h",
+                                        "indicators": [
+                                	    {
+                                            # Previous Relative Strength Index
+                                            "id": "prevrsi",
+                                	        "indicator": "rsi",
+                                            "backtrack": 1
+                                	    },
+                                        {
+                                            # Current Relative Strength Index
+                                            "id": "thisrsi",
+                                	        "indicator": "rsi"
+                                        },
+                                        {
+                                            # Previous Bolinger bands
+                                            "id": "prevbb",
+                                            "indicator": "bbands2",
+                                            "backtrack": 1
+                                        },
+                                        {
+                                            # Current Bolinger bands
+                                            "id": "thisbb",
+                                            "indicator": "bbands2"
+                                        },
+                                        {
+                                            # Previous stoch fast
+                                            "id": "prevstochf",
+                                            "indicator": "stochf",
+                                            "backtrack": 1,
+                                            "optInFastK_Period": 3,
+                                            "optInFastD_Period": 3
+                                        },
+                                        {
+                                            # Current stoch fast
+                                            "id": "thisstochf",
+                                            "indicator": "stochf",
+                                            "optInFastK_Period": 3,
+                                            "optInFastD_Period": 3
+                                        }
+                                        ]
+                                    }
+                                }
+
+                                for _ in range(5):
+                                    try:
+                                        # Send POST request and save the response as response object
+                                        response = requests.post(url = endpoint, json = parameters)
+
+                                        # Extract data in json format
+                                        result = response.json()
+
+                                        prev4HRsi = float(result['data'][0]['result']['value'])
+                                        this4HRsi = float(result['data'][1]['result']['value'])
+                                        prev4HBolingerLowBand = float(result['data'][2]['result']['valueLowerBand'])
+                                        this4HBolingerLowBand = float(result['data'][3]['result']['valueLowerBand'])
+                                        this4HBolingerMidBand = float(result['data'][3]['result']['valueMiddleBand'])
+                                        prev4HStochFFastK = float(result['data'][4]['result']['valueFastK'])
+                                        prev4HStochFFastD = float(result['data'][4]['result']['valueFastD'])
+                                        this4HStochFFastK = float(result['data'][5]['result']['valueFastK'])
+                                        this4HStochFFastD = float(result['data'][5]['result']['valueFastD'])
+                                        await asyncio.sleep(3)
+                                        break
+
+                                        # rsi = result['data'][0]['result']['value']
+                                        # bLBand = result['data'][1]['result']['valueLowerBand']
+                                        # opps.append({
+                                        #     'pair': pair,
+                                        #     'current_value': float(item['quote']['USDT']['price']),
+                                        #     '24h_volume': float(item['quote']['USDT']['volume_24h']),
+                                        #     '1week_change': float(item['quote']['USDT']['percent_change_7d']),
+                                        #     '2hcandle_type': candleType,
+                                        #     '2hcandle_low': float(candle2HLow),
+                                        #     '2hcandle_close': float(candle2HClose),
+                                        #     '2hrsi': float(rsi),
+                                        #     '2hbolinger_lower_band': float(bLBand),
+                                        #     'cv_blb_ratio': float(item['quote']['USDT']['price']) / float(bLBand)
+                                        # })
+                                    except:
+                                        logger.info(f"{pair} | TAAPI Response (4H): {response.reason}. Trying again in 2 seconds...")
+                                        await asyncio.sleep(2)
+                                        continue
+                                # end if time.gmtime()[3] % 4 == 3 and time.gmtime()[4] >= 53
+                            # Get 2H indicators
                             # Define a JSON body with parameters to be sent to the API
                             parameters = {
                                 "secret": config['taapi_api_key'],
                                 "construct": {
                                     "exchange": "binance",
                                     "symbol": taapiSymbol,
-                                    "interval": "4h",
+                                    "interval": "2h",
                                     "indicators": [
-                            	    {
-                                        # Previous Relative Strength Index
-                                        "id": "prevrsi",
-                            	        "indicator": "rsi",
-                                        "backtrack": 1
-                            	    },
                                     {
                                         # Current Relative Strength Index
                                         "id": "thisrsi",
                             	        "indicator": "rsi"
-                                    },
-                                    {
-                                        # Previous Bolinger bands
-                                        "id": "prevbb",
-                                        "indicator": "bbands2",
-                                        "backtrack": 1
-                                    },
-                                    {
-                                        # Current Bolinger bands
-                                        "id": "thisbb",
-                                        "indicator": "bbands2"
-                                    },
-                                    {
-                                        # Previous stoch fast
-                                        "id": "prevstochf",
-                                        "indicator": "stochf",
-                                        "backtrack": 1,
-                                        "optInFastK_Period": 3,
-                                        "optInFastD_Period": 3
                                     },
                                     {
                                         # Current stoch fast
@@ -378,39 +453,20 @@ async def main():
                                     # Extract data in json format
                                     result = response.json()
 
-                                    prev4HRsi = float(result['data'][0]['result']['value'])
-                                    this4HRsi = float(result['data'][1]['result']['value'])
-                                    prev4HBolingerLowBand = float(result['data'][2]['result']['valueLowerBand'])
-                                    this4HBolingerLowBand = float(result['data'][3]['result']['valueLowerBand'])
-                                    this4HBolingerMidBand = float(result['data'][3]['result']['valueMiddleBand'])
-                                    prevStochFFastK = float(result['data'][4]['result']['valueFastK'])
-                                    prevStochFFastD = float(result['data'][4]['result']['valueFastD'])
-                                    thisStochFFastK = float(result['data'][5]['result']['valueFastK'])
-                                    thisStochFFastD = float(result['data'][5]['result']['valueFastD'])
+                                    this2HRsi = float(result['data'][0]['result']['value'])
+                                    this2HStochFFastK = float(result['data'][1]['result']['valueFastK'])
+                                    this2HStochFFastD = float(result['data'][1]['result']['valueFastD'])
                                     await asyncio.sleep(3)
                                     break
-
-                                    # rsi = result['data'][0]['result']['value']
-                                    # bLBand = result['data'][1]['result']['valueLowerBand']
-                                    # opps.append({
-                                    #     'pair': pair,
-                                    #     'current_value': float(item['quote']['USDT']['price']),
-                                    #     '24h_volume': float(item['quote']['USDT']['volume_24h']),
-                                    #     '1week_change': float(item['quote']['USDT']['percent_change_7d']),
-                                    #     '2hcandle_type': candleType,
-                                    #     '2hcandle_low': float(candle2HLow),
-                                    #     '2hcandle_close': float(candle2HClose),
-                                    #     '2hrsi': float(rsi),
-                                    #     '2hbolinger_lower_band': float(bLBand),
-                                    #     'cv_blb_ratio': float(item['quote']['USDT']['price']) / float(bLBand)
-                                    # })
                                 except:
-                                    logger.info(f"{pair} | TAAPI Response: {response.reason}. Trying again in 2 seconds...")
+                                    logger.info(f"{pair} | TAAPI Response (2H): {response.reason}. Trying again in 2 seconds...")
                                     await asyncio.sleep(2)
                                     continue
 
                             try:
-                                logger.info(f"{pair} | Prev Kline {str(prev4HKline)} | This Kline {str(this4HKline)} | Prev Kline Low {str(prev4HKlineLow)} | Prev Lower Bolinger {str(prev4HBolingerLowBand)} | Prev RSI {str(round(prev4HRsi, 2))} | This RSI {str(round(this4HRsi, 2))} | BTCUSDT RSI {str(round(this4HBtcRsi,2))} | Prev StochF K,D {str(round(prevStochFFastK, 2))}|{str(round(prevStochFFastD, 2))} | This StochF K,D {str(round(thisStochFFastK, 2))}|{str(round(thisStochFFastD, 2))}")
+                                if time.gmtime()[3] % 4 == 3 and time.gmtime()[4] >= 53:
+                                    logger.info(f"4H Data: {pair} | Prev Kline {str(prev4HKline)} | This Kline {str(this4HKline)} | Prev Kline Low {str(prev4HKlineLow)} | Prev Lower Bolinger {str(prev4HBolingerLowBand)} | Prev RSI {str(round(prev4HRsi, 2))} | This RSI {str(round(this4HRsi, 2))} | BTCUSDT RSI {str(round(this4HBtcRsi,2))} | Prev StochF K,D {str(round(prev4HStochFFastK, 2))}|{str(round(prev4HStochFFastD, 2))} | This StochF K,D {str(round(this4HStochFFastK, 2))}|{str(round(this4HStochFFastD, 2))}")
+                                logger.info(f"2H Data: {pair} | This RSI {str(round(this2HRsi, 2))} | This StochF K,D {str(round(this4HStochFFastK, 2))}|{str(round(this4HStochFFastD, 2))}")
                                 if (
                                     (time.gmtime()[3] % 4 == 3
                                     and time.gmtime()[4] >= 54
@@ -436,11 +492,11 @@ async def main():
                                     or (
                                         (time.gmtime()[3] % 4 == 3
                                         and time.gmtime()[4] >= 54
-                                        and prevStochFFastK < prevStochFFastD
-                                        and thisStochFFastK > thisStochFFastD
-                                        and thisStochFFastK > 75.0
-                                        and thisStochFFastK < 99.0
-                                        and thisStochFFastK - thisStochFFastD > (thisStochFFastK * 0.275)
+                                        and prev4HStochFFastK < prev4HStochFFastD
+                                        and this4HStochFFastK > this4HStochFFastD
+                                        and this4HStochFFastK > 75.0
+                                        and this4HStochFFastK < 99.0
+                                        and this4HStochFFastK - this4HStochFFastD > (this4HStochFFastK * 0.275)
                                         and this4HRsi < 61.0
                                         and this4HBtcRsi < 69.0
                                         and sim_trades > 0)
@@ -472,7 +528,7 @@ async def main():
                                         profit = round((float(quantity) * float(bnb_sell_price) * 1.0032 * (1.0 - float(config['binance_trade_fee'])) - config['trade_amount']), 3)
                                         # if float(bnb_sell_price) < float(lowest24HPrice):
                                             # lowest24HPrice = float(bnb_sell_price) * 0.98
-                                        trades.append({'pair': pair, 'type': 'sim', 'status': 'active', 'orderid': 0, 'time': time.time(), 'expirytime': time.time() + 43200.0, 'buyprice': float(bnb_sell_price), 'expsellprice': expSellPrice, 'stoploss': stopLoss, 'quantity': quantity})
+                                        trades.append({'pair': pair, 'type': 'sim', 'interval': '4H', 'status': 'active', 'orderid': 0, 'time': time.time(), 'expirytime': time.time() + 43200.0, 'buyprice': float(bnb_sell_price), 'expsellprice': expSellPrice, 'stoploss': stopLoss, 'quantity': quantity})
                                         logger.info(f"<YATB SIM> [{pair}] Bought {str(config['trade_amount'])} @ {sell_price} = {str(quantity)}. Sell @ {fExpSellPrice}. Exp. Profit ~ {str(profit)} USDT")
                                         if config['telegram_notifications_on']:
                                             telegram_bot_sendtext(config['telegram_bot_token'], config['telegram_user_id'], f"<YATB SIM> [{pair}] Bought {str(config['trade_amount'])} @ {sell_price} = {str(quantity)}. Sell @ {fExpSellPrice}. Exp. Profit ~ {str(profit)} USDT")
@@ -493,7 +549,7 @@ async def main():
                                             # if can sell, first you need to cancel Stop Loss order from step 2
                                             # if 8-10 hours pass by and could not sell and Stop Loss did not get triggered,
                                             # then cancel Stop Loss order and sell at current price and move on
-                                    break
+                                    # break
                                 # elif (
                                 #     (((time.localtime()[3] - 2) % 4 == 0
                                 #         and time.localtime()[4] >= 40)
@@ -544,13 +600,25 @@ async def main():
                                 #             # then cancel Stop Loss order and sell at current price and move on
                                 #     break
                                 # elif (
-                                #     prevStochFFastK < prevStochFFastD
-                                #     and thisStochFFastK > thisStochFFastD
-                                #     and thisStochFFastK > 75.0
-                                #     and thisStochFFastK < 99.0
-                                #     and thisStochFFastK - thisStochFFastD > (thisStochFFastK * 0.275)
+                                #     prev4HStochFFastK < prev4HStochFFastD
+                                #     and this4HStochFFastK > this4HStochFFastD
+                                #     and this4HStochFFastK > 75.0
+                                #     and this4HStochFFastK < 99.0
+                                #     and this4HStochFFastK - this4HStochFFastD > (this4HStochFFastK * 0.275)
                                 #     and this4HRsi < 61.0
                                 # ):
+                                elif (
+                                    time.gmtime()[3] % 2 == 1
+                                    and time.gmtime()[4] >= 54
+                                    and this2HRsi < 69.0
+                                    and this2HStochFFastK < 14.5
+                                    and this2HStochFFastK < this2HStochFFastD
+                                    and this4HBtcRsi < 69.0
+                                    and sim_trades > 0
+                                ):
+                                    # Put 2H opportunities in a dict so that we can use them if there are no 4H opps available
+                                    twoHOpps.append({'pair': pair})
+                                    logger.info(f"{pair} good candidate for 2H low Stochastic Fast K stategy")
                                 else:
                                     logger.info(f"{pair} not a good entry point")
                             # elif opp['cv_blb_ratio'] < 1.0 and opp['2hrsi'] < 33.0:
@@ -597,7 +665,44 @@ async def main():
                             #     break
                             except:
                                 logger.info(f"Problem with pair {pair}")
-                                continue
+                    # Try 2H opps if there are trades available
+                    for pair in twoHOpps:
+                        if sim_trades > 0:
+                            ongoingTradePairs.append({'pair': pair, 'expiryTime': time.time() + 5400.0})
+                            bnb_tickers = bnb_exchange.get_orderbook_tickers()
+                            bnb_ticker = next(item for item in bnb_tickers if item['symbol'] == pair)
+                            bnb_sell_price = bnb_ticker['askPrice']
+                            sell_price = ('%.8f' % float(bnb_sell_price)).rstrip('0').rstrip('.')
+                            expSellPrice = float(bnb_sell_price) * 1.0025
+                            stopLoss = float(bnb_sell_price) - ((expSellPrice - float(bnb_sell_price)) * 1.5)
+                            fExpSellPrice = ('%.8f' % expSellPrice).rstrip('0').rstrip('.')
+                            if config['sim_mode_on']:
+                                sim_trades -= 1
+                                quantity = round((float(config['trade_amount']) / float(bnb_sell_price)) * (1.0 - float(config['binance_trade_fee'])), 5)
+                                profit = round((float(quantity) * float(bnb_sell_price) * 1.0025 * (1.0 - float(config['binance_trade_fee'])) - config['trade_amount']), 3)
+                                # if float(bnb_sell_price) < float(lowest24HPrice):
+                                    # lowest24HPrice = float(bnb_sell_price) * 0.98
+                                trades.append({'pair': pair, 'type': 'sim', 'interval': '2H', 'status': 'active', 'orderid': 0, 'time': time.time(), 'expirytime': time.time() + 43200.0, 'buyprice': float(bnb_sell_price), 'expsellprice': expSellPrice, 'stoploss': stopLoss, 'quantity': quantity})
+                                logger.info(f"<YATB SIM> [{pair}] Bought {str(config['trade_amount'])} @ {sell_price} = {str(quantity)}. Sell @ {fExpSellPrice}. Exp. Profit ~ {str(profit)} USDT")
+                                if config['telegram_notifications_on']:
+                                    telegram_bot_sendtext(config['telegram_bot_token'], config['telegram_user_id'], f"<YATB SIM> [{pair}] Bought {str(config['trade_amount'])} @ {sell_price} = {str(quantity)}. Sell @ {fExpSellPrice}. Exp. Profit ~ {str(profit)} USDT")
+                                simulation_balance = float(simulation_balance) - float(config['trade_amount'])
+                            else:
+                                # If available funds >= config['trade_ammount']
+                                bnb_balance_result = bnb_exchange.get_asset_balance(asset='USDT')
+                                if bnb_balance_result:
+                                    bnb_currency_available = bnb_balance_result['free']
+                                else:
+                                    bnb_currency_available = 0.0
+                                #if float(bnb_balance_result) >= config['trade_amount']:
+                                    # 1. Market buy
+                                    # 2. Create Stop loss order (percentage as per config) in order no to get rekt if price drops suddenly
+                                    # 3. Take note of the action so that we act accordingly later when monitoring
+                                    #trades.append({'orderid': , 'time': time.time(), , 'pair': pair})
+                                    # 4. Monitor the price in the next 8-10 hours max and sell when price is equal to result['valueLowerBand']
+                                    # if can sell, first you need to cancel Stop Loss order from step 2
+                                    # if 8-10 hours pass by and could not sell and Stop Loss did not get triggered,
+                                    # then cancel Stop Loss order and sell at current price and move on
                 else: #if sim_trades > 0 and time.localtime()[3] % 4 == 3 and time.localtime()[4] > 30:
                     logger.info("Wating for the right time...")
             else: # if exchange_is_up:

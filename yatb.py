@@ -245,34 +245,36 @@ async def main():
                     #                     'market_cap_dominance': 0.0594, 'fully_diluted_market_cap': 2672386356.4197516, 'last_updated': '2021-08-27T12:56:38.000Z'}}}
                     logger.info("Calculating current opportunities...")
 
-                    this4HBtcRsi = None
-                    del this4HBtcRsi
-                    # First, get current 4h RSI for bitcoin
-                    # Get technical info
-                    endpoint = "https://api.taapi.io/rsi"
-
-                    # Define a JSON body with parameters to be sent to the API
-                    parameters = {
-                        'secret': config['taapi_api_key'],
-                        'exchange': 'binance',
-                        'symbol': 'BTC/USDT',
-                        'interval': '4h'
-                    }
-                    for _ in range(5):
-                        try:
-                            response = requests.get(url = endpoint, params = parameters)
-                            result = response.json()
-                            this4HBtcRsi = result['value']
-                            break
-                        except:
-                            logger.info(f"Retrying... (Getting BTCUSDT 4H RSI)")
-                            await asyncio.sleep(4)
-                            continue
+                    # this4HBtcRsi = None
+                    # del this4HBtcRsi
+                    # # First, get current 4h RSI for bitcoin
+                    # # Get technical info
+                    # endpoint = "https://api.taapi.io/rsi"
+                    #
+                    # # Define a JSON body with parameters to be sent to the API
+                    # parameters = {
+                    #     'secret': config['taapi_api_key'],
+                    #     'exchange': 'binance',
+                    #     'symbol': 'BTC/USDT',
+                    #     'interval': '4h'
+                    # }
+                    # for _ in range(5):
+                    #     try:
+                    #         response = requests.get(url = endpoint, params = parameters)
+                    #         result = response.json()
+                    #         this4HBtcRsi = result['value']
+                    #         break
+                    #     except:
+                    #         logger.info(f"Retrying... (Getting BTCUSDT 4H RSI)")
+                    #         await asyncio.sleep(4)
+                    #         continue
 
                     # Idea -> prepare opps array with klines and TA analysis info and sort it by prev4HRsi ascending
 
-                    twoHOpps = []
-
+                    twoHoursOpps = []
+                    fourHoursOpps = []
+                    oneDayOpps = []
+                    opps = []
                     for item in sortedTargets:
                         pair = item['symbol'] + "USDT"
                         if pair in usdt_tickers and pair not in excludedPairs:
@@ -291,6 +293,9 @@ async def main():
                             prev4HStochFFastD = None
                             this4HStochFFastK = None
                             this4HStochFFastD = None
+                            this1DRsi = None
+                            this1DStochFFastK = None
+                            this1DStochFFastD = None
                             this2HRsi = None
                             this2HStochFFastK = None
                             this2HStochFFastD = None
@@ -307,10 +312,60 @@ async def main():
                             del prev4HStochFFastD
                             del this4HStochFFastK
                             del this4HStochFFastD
+                            del this1DRsi
+                            del this1DStochFFastK
+                            del this1DStochFFastD
                             del this2HRsi
                             del this2HStochFFastK
                             del this2HStochFFastD
 
+                            # Get 1 day tech info if the 1d candle is about to finish
+                            if time.gmtime()[3] % 24 == 23 and time.gmtime()[4] >= 53:
+                                taapiSymbol = pair.split('USDT')[0] + "/" + "USDT"
+                                endpoint = "https://api.taapi.io/bulk"
+
+                                parameters = {
+                                    "secret": config['taapi_api_key'],
+                                    "construct": {
+                                        "exchange": "binance",
+                                        "symbol": taapiSymbol,
+                                        "interval": "1d",
+                                        "indicators": [
+                                        {
+                                            # Current Relative Strength Index
+                                            "id": "thisrsi",
+                                	        "indicator": "rsi"
+                                        },
+                                        {
+                                            # Current stoch fast
+                                            "id": "thisstochf",
+                                            "indicator": "stochf",
+                                            "optInFastK_Period": 3,
+                                            "optInFastD_Period": 3
+                                        }
+                                        ]
+                                    }
+                                }
+
+                                for _ in range(5):
+                                    try:
+                                        # Send POST request and save the response as response object
+                                        response = requests.post(url = endpoint, json = parameters)
+
+                                        # Extract data in json format
+                                        result = response.json()
+
+                                        this1DRsi = float(result['data'][0]['result']['value'])
+                                        this1DStochFFastK = float(result['data'][1]['result']['valueFastK'])
+                                        this1DStochFFastD = float(result['data'][1]['result']['valueFastD'])
+                                        await asyncio.sleep(3)
+                                        break
+                                    except:
+                                        logger.info(f"{pair} | TAAPI Response (1D): {response.reason}. Trying again...")
+                                        await asyncio.sleep(3)
+                                        continue
+
+                            # Get 4 hours tech info if the 4 hours candle is about to finish
                             if time.gmtime()[3] % 4 == 3 and time.gmtime()[4] >= 53:
                                 for _ in range(5):
                                     try:
@@ -432,8 +487,9 @@ async def main():
                                         logger.info(f"{pair} | TAAPI Response (4H): {response.reason}. Trying again...")
                                         await asyncio.sleep(5)
                                         continue
-                                # end if time.gmtime()[3] % 4 == 3 and time.gmtime()[4] >= 53
-                            # Get 2H indicators
+                            # end if time.gmtime()[3] % 4 == 3 and time.gmtime()[4] >= 53
+
+                            # Get 2H indicators when the 2 hours candle is about to finish
                             # Define a JSON body with parameters to be sent to the API
                             taapiSymbol = pair.split('USDT')[0] + "/" + "USDT"
                             endpoint = "https://api.taapi.io/bulk"
@@ -480,233 +536,103 @@ async def main():
                                     continue
 
                             try:
+                                if time.gmtime()[3] % 24 == 23 and time.gmtime()[4] >= 53:
+                                    logger.info(f"1D Data: {pair} | This RSI {str(round(this1DRsi, 2))} | This StochF K,D {str(round(this1DStochFFastK, 2))}|{str(round(this1DStochFFastD, 2))}")
                                 if time.gmtime()[3] % 4 == 3 and time.gmtime()[4] >= 53:
-                                    logger.info(f"4H Data: {pair} | Prev Kline {str(prev4HKline)} | This Kline {str(this4HKline)} | Prev Kline Low {str(prev4HKlineLow)} | Prev Lower Bolinger {str(prev4HBolingerLowBand)} | Prev RSI {str(round(prev4HRsi, 2))} | This RSI {str(round(this4HRsi, 2))} | BTCUSDT RSI {str(round(this4HBtcRsi,2))} | Prev StochF K,D {str(round(prev4HStochFFastK, 2))}|{str(round(prev4HStochFFastD, 2))} | This StochF K,D {str(round(this4HStochFFastK, 2))}|{str(round(this4HStochFFastD, 2))}")
+                                    logger.info(f"4H Data: {pair} | Prev Kline {str(prev4HKline)} | This Kline {str(this4HKline)} | Prev Kline Low {str(prev4HKlineLow)} | Prev Lower Bolinger {str(prev4HBolingerLowBand)} | Prev RSI {str(round(prev4HRsi, 2))} | This RSI {str(round(this4HRsi, 2))} | Prev StochF K,D {str(round(prev4HStochFFastK, 2))}|{str(round(prev4HStochFFastD, 2))} | This StochF K,D {str(round(this4HStochFFastK, 2))}|{str(round(this4HStochFFastD, 2))}")
                                 logger.info(f"2H Data: {pair} | This RSI {str(round(this2HRsi, 2))} | This StochF K,D {str(round(this2HStochFFastK, 2))}|{str(round(this2HStochFFastD, 2))}")
+
                                 if (
+                                    time.gmtime()[3] % 24 == 23
+                                    and time.gmtime()[4] >= 53
+                                    and this1DRsi < 69.0
+                                    and this1DStochFFastK < 14.5
+                                    and this1DStochFFastK < this2HStochFFastD
+                                    and sim_trades > 0
+                                ):
+                                    # Put 1D opportunities in opps dict
+                                    opps.append({'pair': pair, 'interval': "1d"})
+                                    # twoHoursOpps.append({'pair': pair})
+                                    logger.info(f"{pair} good candidate for the 1 day strategy")
+                                elif (
                                     (time.gmtime()[3] % 4 == 3
-                                    and time.gmtime()[4] >= 54
+                                    and time.gmtime()[4] >= 53
                                     and this4HKline == 'negative'
                                     and float(this4HKlineClose) < float(this4HBolingerLowBand)
                                     and this4HRsi < 35.0
-                                    # and this4HBtcRsi < 69.0
                                     and sim_trades > 0)
-                                    # or (
-                                    #     ((time.gmtime()[3] % 4 == 0
-                                    #         and time.gmtime()[4] >= 30)
-                                    #         or (time.gmtime()[3] % 4 == 1 and time.gmtime()[4] <= 30)
-                                    #     )
                                     or (time.gmtime()[3] % 4 == 3
-                                        and time.gmtime()[4] >= 54
+                                        and time.gmtime()[4] >= 53
                                         and prev4HKline == 'negative'
                                         and this4HKline == 'positive'
                                         and float(this4HKlineLow) < float(this4HBolingerLowBand)
                                         and float(this4HKlineClose) < float(this4HBolingerMidBand)
-                                        # and this4HBtcRsi < 69.0
                                         and sim_trades > 0
                                     )
                                     or (
                                         (time.gmtime()[3] % 4 == 3
-                                        and time.gmtime()[4] >= 54
+                                        and time.gmtime()[4] >= 53
                                         and prev4HStochFFastK < prev4HStochFFastD
                                         and this4HStochFFastK > this4HStochFFastD
                                         and this4HStochFFastK > 75.0
                                         and this4HStochFFastK < 99.0
                                         and this4HStochFFastK - this4HStochFFastD > (this4HStochFFastK * 0.275)
                                         and this4HRsi < 61.0
-                                        # and this4HBtcRsi < 69.0
                                         and sim_trades > 0)
                                     )
                                 ):
-                        # # Remove opps having positive 'cv_blb_ratio'
-                        # opps = [item for item in opps if item['cv_blb_ratio'] < 1.0]
-                        # # Sort opps by 'cv_blb_ratio' ascending
-                        # sortedOpps = sorted(opps, key=lambda k: k['cv_blb_ratio'], reverse=False)
-                        # logger.info(f"{len(sortedOpps)} opportunitie(s) spotted!")
-                        # print(sortedOpps)
-                        #
-                        # for opp in sortedOpps:
-                        #     logger.info(f"Opportunity: {opp}")
-                        #     if opp['cv_blb_ratio'] < 0.975:
-                                    # This looks like a nice opportunity (previous cqndle is negative, below Bolinger lower band, RSI < 35 and this RSI > previous RSI):
-                                    # Update ongoingTradePairs
-                                    ongoingTradePairs.append({'pair': pair, 'expiryTime': time.time() + 5400.0})
-                                    bnb_tickers = bnb_exchange.get_orderbook_tickers()
-                                    bnb_ticker = next(item for item in bnb_tickers if item['symbol'] == pair)
-                                    bnb_sell_price = bnb_ticker['askPrice']
-                                    sell_price = ('%.8f' % float(bnb_sell_price)).rstrip('0').rstrip('.')
-                                    expSellPrice = float(bnb_sell_price) * 1.0032
-                                    stopLoss = float(bnb_sell_price) - ((expSellPrice - float(bnb_sell_price)) * 1.5)
-                                    fExpSellPrice = ('%.8f' % expSellPrice).rstrip('0').rstrip('.')
-                                    if config['sim_mode_on']:
-                                        sim_trades -= 1
-                                        quantity = round((float(config['trade_amount']) / float(bnb_sell_price)) * (1.0 - float(config['binance_trade_fee'])), 5)
-                                        profit = round((float(quantity) * float(bnb_sell_price) * 1.0032 * (1.0 - float(config['binance_trade_fee'])) - config['trade_amount']), 3)
-                                        # if float(bnb_sell_price) < float(lowest24HPrice):
-                                            # lowest24HPrice = float(bnb_sell_price) * 0.98
-                                        trades.append({'pair': pair, 'type': 'sim', 'interval': '4H', 'status': 'active', 'orderid': 0, 'time': time.time(), 'expirytime': time.time() + 43200.0, 'buyprice': float(bnb_sell_price), 'expsellprice': expSellPrice, 'stoploss': stopLoss, 'quantity': quantity})
-                                        logger.info(f"<YATB SIM> [{pair}] Bought {str(config['trade_amount'])} @ {sell_price} = {str(quantity)}. Sell @ {fExpSellPrice}. Exp. Profit ~ {str(profit)} USDT")
-                                        if config['telegram_notifications_on']:
-                                            telegram_bot_sendtext(config['telegram_bot_token'], config['telegram_user_id'], f"<YATB SIM> [{pair}] Bought {str(config['trade_amount'])} @ {sell_price} = {str(quantity)}. Sell @ {fExpSellPrice}. Exp. Profit ~ {str(profit)} USDT")
-                                        simulation_balance = float(simulation_balance) - float(config['trade_amount'])
-                                    else:
-                                        # If available funds >= config['trade_ammount']
-                                        bnb_balance_result = bnb_exchange.get_asset_balance(asset='USDT')
-                                        if bnb_balance_result:
-                                            bnb_currency_available = bnb_balance_result['free']
-                                        else:
-                                            bnb_currency_available = 0.0
-                                        #if float(bnb_balance_result) >= config['trade_amount']:
-                                            # 1. Market buy
-                                            # 2. Create Stop loss order (percentage as per config) in order no to get rekt if price drops suddenly
-                                            # 3. Take note of the action so that we act accordingly later when monitoring
-                                            #trades.append({'orderid': , 'time': time.time(), , 'pair': pair})
-                                            # 4. Monitor the price in the next 8-10 hours max and sell when price is equal to result['valueLowerBand']
-                                            # if can sell, first you need to cancel Stop Loss order from step 2
-                                            # if 8-10 hours pass by and could not sell and Stop Loss did not get triggered,
-                                            # then cancel Stop Loss order and sell at current price and move on
-                                    # break
-                                # elif (
-                                #     (((time.localtime()[3] - 2) % 4 == 0
-                                #         and time.localtime()[4] >= 40)
-                                #         or ((time.localtime()[3] - 2) % 4 == 1 and time.localtime()[4] <= 30)
-                                #     )
-                                #     and beforePrev4HKline == 'negative'
-                                #     and prev4HKline == 'positive'
-                                #     and float(prev4HKlineLow) < float(prev4HBolingerLowBand)
-                                #     and prev4HRsi < this4HRsi
-                                #     and sim_trades > 0
-                                # ):
-                                #     # This looks like a nice opportunity (prev low price is below Bolinger lower band and prev candle is positive and before prev candle is negative):
-                                #     # Update ongoingTradePairs
-                                #     ongoingTradePairs.append({'pair': pair, 'expiryTime': time.time() + 5400.0})
-                                #     bnb_tickers = bnb_exchange.get_orderbook_tickers()
-                                #     bnb_ticker = next(item for item in bnb_tickers if item['symbol'] == pair)
-                                #     bnb_sell_price = bnb_ticker['askPrice']
-                                #     sell_price = ('%.8f' % float(bnb_sell_price)).rstrip('0').rstrip('.')
-                                #     expSellPrice = float(bnb_sell_price) * 1.0032
-                                #     stopLoss = float(bnb_sell_price) - ((expSellPrice - float(bnb_sell_price)) * 1.5)
-                                #     fExpSellPrice = ('%.8f' % expSellPrice).rstrip('0').rstrip('.')
-                                #     if config['sim_mode_on']:
-                                #         sim_trades -= 1
-                                #         quantity = round((float(config['trade_amount']) / float(bnb_sell_price)) * (1.0 - float(config['binance_trade_fee'])), 2)
-                                #         profit = round((float(quantity) * float(bnb_sell_price) * 1.0032 * (1.0 - float(config['binance_trade_fee'])) - config['trade_amount']), 2)
-                                #         # if float(bnb_sell_price) < float(lowest24HPrice):
-                                #             # lowest24HPrice = float(bnb_sell_price) * 0.98
-                                #         trades.append({'pair': pair, 'type': 'sim', 'status': 'active', 'orderid': 0, 'time': time.time(), 'expirytime': time.time() + 43200.0, 'buyprice': float(bnb_sell_price), 'expsellprice': expSellPrice, 'stoploss': stopLoss, 'quantity': quantity})
-                                #         logger.info(f"<YATB SIM> [{pair}] Bought {str(config['trade_amount'])} @ {sell_price} = {str(quantity)}. Sell @ {fExpSellPrice}. Exp. Profit ~ {str(round(profit, 2))} USDT")
-                                #         if config['telegram_notifications_on']:
-                                #             telegram_bot_sendtext(config['telegram_bot_token'], config['telegram_user_id'], f"<YATB SIM> [{pair}] Bought {str(config['trade_amount'])} @ {sell_price} = {str(quantity)}. Sell @ {fExpSellPrice}. Exp. Profit ~ {str(round(profit, 2))} USDT")
-                                #         simulation_balance = float(simulation_balance) - float(config['trade_amount'])
-                                #     else:
-                                #         # If available funds >= config['trade_ammount']
-                                #         bnb_balance_result = bnb_exchange.get_asset_balance(asset='USDT')
-                                #         if bnb_balance_result:
-                                #             bnb_currency_available = bnb_balance_result['free']
-                                #         else:
-                                #             bnb_currency_available = 0.0
-                                #         #if float(bnb_balance_result) >= config['trade_amount']:
-                                #             # 1. Market buy
-                                #             # 2. Create Stop loss order (percentage as per config) in order no to get rekt if price drops suddenly
-                                #             # 3. Take note of the action so that we act accordingly later when monitoring
-                                #             #trades.append({'orderid': , 'time': time.time(), , 'pair': pair})
-                                #             # 4. Monitor the price in the next 8-10 hours max and sell when price is equal to result['valueLowerBand']
-                                #             # if can sell, first you need to cancel Stop Loss order from step 2
-                                #             # if 8-10 hours pass by and could not sell and Stop Loss did not get triggered,
-                                #             # then cancel Stop Loss order and sell at current price and move on
-                                #     break
-                                # elif (
-                                #     prev4HStochFFastK < prev4HStochFFastD
-                                #     and this4HStochFFastK > this4HStochFFastD
-                                #     and this4HStochFFastK > 75.0
-                                #     and this4HStochFFastK < 99.0
-                                #     and this4HStochFFastK - this4HStochFFastD > (this4HStochFFastK * 0.275)
-                                #     and this4HRsi < 61.0
-                                # ):
+                                    # Put 4H opportunities in opps dict
+                                    opps.append({'pair': pair, 'interval': "4h"})
+                                    # twoHoursOpps.append({'pair': pair})
+                                    logger.info(f"{pair} good candidate for one of the 4H strategies")
                                 elif (
                                     time.gmtime()[3] % 2 == 1
-                                    and time.gmtime()[4] >= 54
+                                    and time.gmtime()[4] >= 53
                                     and this2HRsi < 69.0
                                     and this2HStochFFastK < 14.5
                                     and this2HStochFFastK < this2HStochFFastD
-                                    and this4HBtcRsi < 69.0
                                     and sim_trades > 0
                                 ):
-                                    # Put 2H opportunities in a dict so that we can use them if there are no 4H opps available
-                                    twoHOpps.append({'pair': pair})
+                                    # Put 2H opportunities in opps dict
+                                    opps.append({'pair': pair, 'interval': "2h"})
+                                    # twoHoursOpps.append({'pair': pair})
                                     logger.info(f"{pair} good candidate for 2H low Stochastic Fast K stategy")
                                 else:
                                     logger.info(f"{pair} not a good entry point")
-                            # elif opp['cv_blb_ratio'] < 1.0 and opp['2hrsi'] < 33.0:
-                            #     # This can be a good opportunity if RSI indicator is below ~ 33
-                            #     logger.info(f"<YATB> [{pair}] Current price {str(round(float(bnb_sell_price, 4)))} is {str(round(opp['cv_blb_ratio'], 4))} below Bolinger lower band = {str(round(opp['2hbolinger_lower_band'], 4))} and RSI is below 33 ({str(round(opp['2hrsi'], 4))})")
-                            #     if config['telegram_notifications_on']:
-                            #         telegram_bot_sendtext(config['telegram_bot_token'], config['telegram_user_id'], f"<YATB> [{pair}] Current price {str(round(float(bnb_sell_price, 4)))} is {str(round(opp['cv_blb_ratio'], 4))} below Bolinger lower band = {str(round(opp['2hbolinger_lower_band'], 4))} and RSI is below 33 ({str(round(opp['2hrsi'], 4))})")
-                            #     if config['sim_mode_on']:
-                            #         sim_trades -= 1
-                            #         quantity = round((float(config['trade_amount']) / float(bnb_sell_price)) * (1.0 - float(config['binance_trade_fee'])), 2)
-                            #         sell_at = float(bnb_sell_price) * (1.0 + float(config['profit_percentage']))
-                            #         trades.append({'pair': pair, 'type': 'sim', 'status': 'active', 'orderid': 0, 'expirytime': time.time() + 28800.0, 'buyprice': float(bnb_sell_price), 'expsellprice': float(sell_at), 'stoploss': float(bnb_sell_price)*config['stop_loss_percentage'], 'quantity': quantity})
-                            #         profit = round(float(quantity) * float(sell_at) * (1.0 - float(config['binance_trade_fee'])), 2)
-                            #         logger.info(f"<YATB SIM> [{pair}] Bought at {str(round(float(bnb_sell_price, 4)))}. Hoping to sell at {str(round(sell_at, 4))}. Exp. Profit ~ {str(round(profit, 2))} USDT")
-                            #         if config['telegram_notifications_on']:
-                            #             telegram_bot_sendtext(config['telegram_bot_token'], config['telegram_user_id'], f"<YATB SIM> [{pair}] Bought at {str(round(float(bnb_sell_price, 4)))}. Hoping to sell at {str(round(sell_at, 4))}. Exp. Profit ~ {str(round(profit, 2))} USDT")
-                            #         simulation_balance = float(simulation_balance) - float(config['trade_amount'])
-                            #     else:
-                            #         # If available funds >= config['trade_ammount']
-                            #         bnb_balance_result = bnb_exchange.get_asset_balance(asset='USDT')
-                            #         if bnb_balance_result:
-                            #             bnb_currency_available = bnb_balance_result['free']
-                            #         else:
-                            #             bnb_currency_available = 0.0
-                            #         #if float(bnb_balance_result) >= config['trade_amount']:
-                            #             # 1. Market buy
-                            #             # 2. Create Stop loss order (percentage as per config) in order no to get rekt if price drops suddenly
-                            #             # 3. Monitor the price in the next 8-10 hours max and sell when price is equal percentage set in config for benefit
-                            #             #trades.append({'orderid': , 'time': time.time(), , 'pair': pair})
-                            #             # 4. Monitor the price in the next 8-10 hours max and sell when price is equal to result['valueLowerBand']
-                            #             # if can sell, first you need to cancel Stop Loss order from step 2
-                            #             # if 8-10 hours pass by and could not sell and Stop Loss did not get triggered,
-                            #             # then cancel Stop Loss order and sell at current price and move on
-                            #
-                            #     # end of if float(bnb_sell_price) < float(result['valueLowerBand']):
-                            # else: # if (config['sim_mode_on'] and sim_trades > 0) or (not config['sim_mode_on'] and float(bnb_currency_available) >= config['trade_amount']):
-                            #     logger.info("Opportunity not valid :(")
-                            # bnb_balance_result = bnb_exchange.get_asset_balance(asset='USDT')
-                            # if bnb_balance_result:
-                            #     bnb_currency_available = bnb_balance_result['free']
-                            # else:
-                            #     bnb_currency_available = 0.0
-                            # if (config['sim_mode_on'] and sim_trades == 0) or (not config['sim_mode_on'] and float(bnb_currency_available) < float(config['trade_amount'])):
-                            #     break
                             except:
                                 logger.info(traceback.format_exc())
                                 logger.info(f"Problem with pair {pair}")
-                    logger.info("2H opps ==========>")
-                    logger.info(twoHOpps)
-                    # Try 2H opps if there are trades available
-                    for pair in twoHOpps:
+                    logger.info("Opps ==========>")
+                    logger.info(opps)
+                    for opp in opps:
                         if sim_trades > 0:
-                            ongoingTradePairs.append({'pair': pair, 'expiryTime': time.time() + 5400.0})
+                            ongoingTradePairs.append({'pair': opp['pair'], 'expiryTime': time.time() + 5400.0})
                             bnb_tickers = bnb_exchange.get_orderbook_tickers()
-                            bnb_ticker = next(item for item in bnb_tickers if item['symbol'] == pair)
+                            bnb_ticker = next(item for item in bnb_tickers if item['symbol'] == opp['pair'])
                             bnb_sell_price = bnb_ticker['askPrice']
                             sell_price = ('%.8f' % float(bnb_sell_price)).rstrip('0').rstrip('.')
-                            expSellPrice = float(bnb_sell_price) * 1.0025
+                            if opp['interval'] == "1d":
+                                expectedProfitPercentage = 1.007
+                            elif opp['interval'] == "4h":
+                                expectedProfitPercentage = 1.0032
+                            else:
+                                expectedProfitPercentage = 1.0025
+                            expSellPrice = float(bnb_sell_price) * expectedProfitPercentage
                             stopLoss = float(bnb_sell_price) - ((expSellPrice - float(bnb_sell_price)) * 1.5)
                             fExpSellPrice = ('%.8f' % expSellPrice).rstrip('0').rstrip('.')
                             if config['sim_mode_on']:
+                                # Simulate buy order
                                 sim_trades -= 1
                                 quantity = round((float(config['trade_amount']) / float(bnb_sell_price)) * (1.0 - float(config['binance_trade_fee'])), 5)
-                                profit = round((float(quantity) * float(bnb_sell_price) * 1.0025 * (1.0 - float(config['binance_trade_fee'])) - config['trade_amount']), 3)
-                                # if float(bnb_sell_price) < float(lowest24HPrice):
-                                    # lowest24HPrice = float(bnb_sell_price) * 0.98
-                                trades.append({'pair': pair, 'type': 'sim', 'interval': '2H', 'status': 'active', 'orderid': 0, 'time': time.time(), 'expirytime': time.time() + 43200.0, 'buyprice': float(bnb_sell_price), 'expsellprice': expSellPrice, 'stoploss': stopLoss, 'quantity': quantity})
-                                logger.info(f"<YATB SIM> [{pair}] Bought {str(config['trade_amount'])} @ {sell_price} = {str(quantity)}. Sell @ {fExpSellPrice}. Exp. Profit ~ {str(profit)} USDT")
+                                profit = round((float(quantity) * float(bnb_sell_price) * expectedProfitPercentage * (1.0 - float(config['binance_trade_fee'])) - config['trade_amount']), 3)
+                                trades.append({'pair': opp['pair'], 'type': 'sim', 'interval': '2H', 'status': 'active', 'orderid': 0, 'time': time.time(), 'expirytime': time.time() + 43200.0, 'buyprice': float(bnb_sell_price), 'expsellprice': expSellPrice, 'stoploss': stopLoss, 'quantity': quantity})
+                                logger.info(f"<YATB SIM> [{opp['pair']}] Bought {str(config['trade_amount'])} @ {sell_price} = {str(quantity)}. Sell @ {fExpSellPrice}. Exp. Profit ~ {str(profit)} USDT")
                                 if config['telegram_notifications_on']:
-                                    telegram_bot_sendtext(config['telegram_bot_token'], config['telegram_user_id'], f"<YATB SIM> [{pair}] Bought {str(config['trade_amount'])} @ {sell_price} = {str(quantity)}. Sell @ {fExpSellPrice}. Exp. Profit ~ {str(profit)} USDT")
+                                    telegram_bot_sendtext(config['telegram_bot_token'], config['telegram_user_id'], f"<YATB SIM> [{opp['pair']}] Bought {str(config['trade_amount'])} @ {sell_price} = {str(quantity)}. Sell @ {fExpSellPrice}. Exp. Profit ~ {str(profit)} USDT")
                                 simulation_balance = float(simulation_balance) - float(config['trade_amount'])
                             else:
+                                # Buy order
+                                sim_trades -= 1
                                 # If available funds >= config['trade_ammount']
                                 bnb_balance_result = bnb_exchange.get_asset_balance(asset='USDT')
                                 if bnb_balance_result:

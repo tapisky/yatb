@@ -548,6 +548,7 @@ async def main():
                                     and this1DRsi < 69.0
                                     and this1DStochFFastK < 14.5
                                     and this1DStochFFastK < this2HStochFFastD
+                                    and this1DStochFFastK + 10.0 < this2HStochFFastD
                                     and sim_trades > 0
                                 ):
                                     # Put 1D opportunities in opps dict

@@ -13,6 +13,7 @@ import pickle
 import os.path
 import requests
 
+from datetime import datetime
 from requests import Request, Session
 from requests.exceptions import ConnectionError, Timeout, TooManyRedirects
 from os.path import exists
@@ -105,7 +106,16 @@ async def main():
             logger.info("Trades ==========>")
             logger.info(trades)
 
-            # TODO: check if googlesheet is up to date and if not, update it
+            # Update google sheet status field
+            dateStamp = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+            statusMessage = f"{dateStamp} -- Iteration {iteration}"
+            for _ in range(5):
+                try:
+                    update_google_sheet_status(config['sheet_id'], statusMessage)
+                    break
+                except:
+                    await asyncio.sleep(3)
+                    continue
 
             # Check first if exchanges are both up
             if config['sim_mode_on']:
@@ -159,13 +169,13 @@ async def main():
                                 except:
                                     await asyncio.sleep(5)
                                     continue
-                                    for _ in range(5):
-                                        try:
-                                            update_sheet_trades_result(config['sheet_id'], trade['result'])
-                                            break
-                                        except:
-                                            await asyncio.sleep(5)
-                                            continue
+                            # for _ in range(5):
+                            #     try:
+                            #         update_sheet_trades_result(config['sheet_id'], trade['result'])
+                            #         break
+                            #     except:
+                            #         await asyncio.sleep(5)
+                            #         continue
                     else:
                         # Current trade is still valid
                         logger.info(f"<YATB> [{trade['pair']}] Trade ongoing:")
@@ -713,7 +723,7 @@ async def main():
                                     # if 8-10 hours pass by and could not sell and Stop Loss did not get triggered,
                                     # then cancel Stop Loss order and sell at current price and move on
                 else: #if sim_trades > 0 and time.localtime()[3] % 4 == 3 and time.localtime()[4] > 30:
-                    logger.info("Wating for the right time...")
+                    logger.info("Waiting for the right time...")
             else: # if exchange_is_up:
                 logger.info("One of the exchanges was down or under maintenance!")
 
@@ -2468,6 +2478,40 @@ def update_sheet_trades_result(sheet_id, trade_result):
                                    range=data_range,
                                    valueInputOption=value_input_option,
                                    body=value_range_body).execute()
+
+def update_google_sheet_status(sheetId, statusMessage):
+    creds = None
+    # The file token.pickle stores the user's access and refresh tokens, and is
+    # created automatically when the authorization flow completes for the first
+    # time.
+    if os.path.exists('token.pickle'):
+        with open('token.pickle', 'rb') as token:
+            creds = pickle.load(token)
+
+            service = build('sheets', 'v4', credentials=creds)
+
+            # Call the Sheets API
+            sheet = service.spreadsheets()
+
+    # Update google sheet with status
+    # How the input data should be interpreted.
+    valueInputOption = 'USER_ENTERED'
+
+    dataRange = "SimulationTest!F2:F2"
+
+    valueRangeBody = {
+        "range": dataRange,
+        "majorDimension": "ROWS",
+        "values": [
+            [statusMessage],
+        ],
+    }
+
+    # append new balance and date
+    result = sheet.values().update(spreadsheetId=sheetId,
+                                   range=dataRange,
+                                   valueInputOption=valueInputOption,
+                                   body=valueRangeBody).execute()
 
 def get_simulation_balance(sheet_id):
     creds = None

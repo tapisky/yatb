@@ -479,7 +479,7 @@ async def main():
                                     and this4HKline == 'negative'
                                     and float(this4HKlineClose) < float(this4HBolingerLowBand)
                                     and this4HRsi < 35.0
-                                    and this4HBtcRsi < 69.0
+                                    # and this4HBtcRsi < 69.0
                                     and sim_trades > 0)
                                     # or (
                                     #     ((time.gmtime()[3] % 4 == 0
@@ -492,7 +492,7 @@ async def main():
                                         and this4HKline == 'positive'
                                         and float(this4HKlineLow) < float(this4HBolingerLowBand)
                                         and float(this4HKlineClose) < float(this4HBolingerMidBand)
-                                        and this4HBtcRsi < 69.0
+                                        # and this4HBtcRsi < 69.0
                                         and sim_trades > 0
                                     )
                                     or (
@@ -504,7 +504,7 @@ async def main():
                                         and this4HStochFFastK < 99.0
                                         and this4HStochFFastK - this4HStochFFastD > (this4HStochFFastK * 0.275)
                                         and this4HRsi < 61.0
-                                        and this4HBtcRsi < 69.0
+                                        # and this4HBtcRsi < 69.0
                                         and sim_trades > 0)
                                     )
                                 ):

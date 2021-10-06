@@ -260,9 +260,11 @@ async def main():
                             continue
 
                     # Idea -> prepare opps array with klines and TA analysis info and sort it by prev4HRsi ascending
+
+                    twoHOpps = []
+
                     for item in sortedTargets:
                         pair = item['symbol'] + "USDT"
-                        twoHOpps = []
                         if pair in usdt_tickers and pair not in excludedPairs:
 
                             # Initialize variables

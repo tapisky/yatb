@@ -47,31 +47,6 @@ async def main():
     config = get_config()
     logger = setupLogger('logfile.log')
 
-    ticker_pairs = ['XXLMZEUR', 'DOTEUR', 'LINKEUR', 'ADAEUR']
-    pair_coins = {'XXLMZEUR': {'bnb_pair': 'XLMEUR', 'bnb_base': 'XLM', 'base': 'XXLM', 'quote': 'ZEUR', 'krk_address': config['krk_xlm_address'], 'krk_address_memo': config['krk_xlm_address_memo']},
-                  'DOTEUR': {'bnb_pair': 'DOTEUR', 'bnb_base': 'DOT', 'base': 'DOT', 'quote': 'ZEUR', 'krk_address': config['krk_dot_address']},
-                  'LINKEUR': {'bnb_pair': 'LINKEUR', 'bnb_base': 'LINK', 'base': 'LINK', 'quote': 'ZEUR', 'krk_address': config['krk_link_address']},
-                  'ADAEUR': {'bnb_pair': 'ADAEUR', 'bnb_base': 'ADA', 'base': 'ADA', 'quote': 'ZEUR', 'krk_address': config['krk_ada_address']},
-                  'EURUSDT': {'bnb_pair': 'EURUSDT', 'bnb_base': 'EUR', 'base': 'ZEUR', 'quote': 'USDT', 'krk_address': config['krk_usdt_address']},
-                  'ADAUSDT': {'bnb_pair': 'ADAUSDT', 'bnb_base': 'ADA', 'base': 'ADA', 'quote': 'USDT', 'krk_bnb_address': config['krk_bnb_usdt_address_key'], 'bnb_krk_address': config['krk_ada_address']},
-                  'DOTUSDT': {'bnb_pair': 'DOTUSDT', 'bnb_base': 'DOT', 'base': 'DOT', 'quote': 'USDT', 'krk_bnb_address': config['krk_bnb_usdt_address_key'], 'bnb_krk_address': config['krk_dot_address']},
-                  'XRPUSDT': {'bnb_pair': 'XRPUSDT', 'bnb_base': 'XRP', 'base': 'XRP', 'quote': 'USDT', 'krk_bnb_address': config['krk_bnb_usdt_address_key'], 'bnb_krk_address': config['krk_xrp_address']}}
-
-    # pairs = {'DOTUSDT': {'taapi_pair': 'DOT/USDT'},
-    #          'ADAUSDT': {'taapi_pair': 'ADA/USDT'},
-    #          'LTCUSDT': {'taapi_pair': 'LTC/USDT'},
-    #          'XRPUSDT': {'taapi_pair': 'XRP/USDT'},
-    #          'BTCUSDT': {'taapi_pair': 'BTC/USDT'},
-    #          'ETHUSDT': {'taapi_pair': 'ETH/USDT'},
-    #          'DOGEUSDT': {'taapi_pair': 'DOGE/USDT'},
-    #          'LINKUSDT': {'taapi_pair': 'LINK/USDT'}}
-
-    # pairs = {'LTCUSDT': {'taapi_pair': 'LTC/USDT'},
-    #          'XRPUSDT': {'taapi_pair': 'XRP/USDT'},
-    #          'BTCUSDT': {'taapi_pair': 'BTC/USDT'},
-    #          'ETHUSDT': {'taapi_pair': 'ETH/USDT'},
-    #          'XMRUSDT': {'taapi_pair': 'XMR/USDT'}}
-
     stable_coins = ['USDCUSDT', 'PAXUSDT', 'ONGUSDT', 'TUSDUSDT', 'BUSDUSDT', 'ONTUSDT', 'GUSDUSDT', 'DGXUSDT', 'DAIUSDT']
 
     # Binance API setup
@@ -2409,7 +2384,7 @@ def update_sheet_trades_result(sheet_id, trade_result):
                                    valueInputOption=value_input_option,
                                    body=value_range_body).execute()
 
-def update_google_sheet_status(sheetId, statusMessage):
+def update_google_sheet_status(sheet_id, status_message):
     creds = None
     # The file token.pickle stores the user's access and refresh tokens, and is
     # created automatically when the authorization flow completes for the first
@@ -2425,23 +2400,23 @@ def update_google_sheet_status(sheetId, statusMessage):
 
     # Update google sheet with status
     # How the input data should be interpreted.
-    valueInputOption = 'USER_ENTERED'
+    value_input_option = 'USER_ENTERED'
 
-    dataRange = "SimulationTest!F2:F2"
+    data_range = "SimulationTest!F2:F2"
 
-    valueRangeBody = {
-        "range": dataRange,
+    value_range_body = {
+        "range": data_range,
         "majorDimension": "ROWS",
         "values": [
-            [statusMessage],
+            [status_message],
         ],
     }
 
     # append new balance and date
-    result = sheet.values().update(spreadsheetId=sheetId,
-                                   range=dataRange,
-                                   valueInputOption=valueInputOption,
-                                   body=valueRangeBody).execute()
+    result = sheet.values().update(spreadsheetId=sheet_id,
+                                   range=data_range,
+                                   valueInputOption=value_input_option,
+                                   body=value_range_body).execute()
 
 def get_simulation_balance(sheet_id):
     creds = None

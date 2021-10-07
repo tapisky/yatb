@@ -592,6 +592,7 @@ async def main():
                                     and this2HRsi < 69.0
                                     and this2HStochFFastK < 14.5
                                     and this2HStochFFastK < this2HStochFFastD
+                                    and this2HStochFFastK + 10.0 < this2HStochFFastD
                                     and sim_trades > 0
                                 ):
                                     # Put 2H opportunities in opps dict

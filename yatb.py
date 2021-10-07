@@ -56,6 +56,7 @@ async def main():
     # Setup Binance availble USDT pairs
     tickers = bnb_exchange.get_all_tickers()
     usdt_tickers = [item for item in tickers if 'USDT' in item['symbol']]
+
     # Remove Stable coins
     usdt_tickers = [item for item in usdt_tickers if item['symbol'] not in stable_coins]
     usdt_tickers = list(map(lambda x: x['symbol'], usdt_tickers))
@@ -170,10 +171,20 @@ async def main():
                 # Check if there are available trades and if the time to check markets is correct
                 if (
                     sim_trades > 0
-                    and ((time.gmtime()[3] % 4 == 3 and time.gmtime()[4] >= 53)
-                        or (time.gmtime()[3] % 2 == 1 and time.gmtime()[4] >= 53)
-                        )
+                    and time.gmtime()[3] % 2 == 1
+                    and time.gmtime()[4] >= 53
+                    and time.gmtime()[4] < 58
                 ):
+                    # Update google sheet status field
+                    dateStamp = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+                    statusMessage = f"{dateStamp} -- Iteration {iteration}: Looking for opportunities"
+                    for _ in range(3):
+                        try:
+                            update_google_sheet_status(config['sheet_id'], statusMessage)
+                            break
+                        except:
+                            await asyncio.sleep(1)
+                            continue
 
                     # Check good opportunities to buy
                     # Get Coin Market Cap data: assets with a negative 24h percentage and a minimum 24h volume of $50 millions
@@ -182,7 +193,7 @@ async def main():
                     url = 'https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest'
                     parameters = {
                         'start':'1',
-                        'limit':'35',
+                        'limit':'32',
                         'convert':'USDT',
                         'market_cap_min': 2000000000,
                         'volume_24h_min': 35000000
@@ -204,56 +215,15 @@ async def main():
                             logger.info(e)
                             print("Retrying after 30 seconds...")
                             await asyncio.sleep(30)
-
                     targets = data['data']
                     sortedTargets = sorted(targets, key=lambda k: k['quote']['USDT']['percent_change_7d'], reverse=False)
                     logger.info(f"{str(len(targets))} target(s)...")
 
-                    # sortedTargets contains assets with negative price change percentage sorted by 7d percentage change ascending
-                    # One item sample:
-                    # {'id': 2577, 'name': 'Ravencoin', 'symbol': 'RVN', 'slug': 'ravencoin', 'num_market_pairs': 81, 'date_added': '2018-03-10T00:00:00.000Z',
-                    #  'tags': ['mineable', 'platform', 'crowdfunding'], 'max_supply': 21000000000, 'circulating_supply': 9518625000, 'total_supply': 9518625000,
-                    #  'platform': None, 'cmc_rank': 81, 'last_updated': '2021-08-27T12:55:26.000Z',
-                    #  'quote': {'USDT': {'price': 0.12725649316268403, 'volume_24h': 75989470.31687154, 'percent_change_1h': -0.42271994,
-                    #                     'percent_change_24h': -0.68160527, 'percent_change_7d': -12.89896191, 'percent_change_30d': 109.7001008,
-                    #                     'percent_change_60d': 140.49810357, 'percent_change_90d': 63.96213584, 'market_cap': 1211306837.230653,
-                    #                     'market_cap_dominance': 0.0594, 'fully_diluted_market_cap': 2672386356.4197516, 'last_updated': '2021-08-27T12:56:38.000Z'}}}
                     logger.info("Calculating current opportunities...")
-
-                    # this4HBtcRsi = None
-                    # del this4HBtcRsi
-                    # # First, get current 4h RSI for bitcoin
-                    # # Get technical info
-                    # endpoint = "https://api.taapi.io/rsi"
-                    #
-                    # # Define a JSON body with parameters to be sent to the API
-                    # parameters = {
-                    #     'secret': config['taapi_api_key'],
-                    #     'exchange': 'binance',
-                    #     'symbol': 'BTC/USDT',
-                    #     'interval': '4h'
-                    # }
-                    # for _ in range(5):
-                    #     try:
-                    #         response = requests.get(url = endpoint, params = parameters)
-                    #         result = response.json()
-                    #         this4HBtcRsi = result['value']
-                    #         break
-                    #     except:
-                    #         logger.info(f"Retrying... (Getting BTCUSDT 4H RSI)")
-                    #         await asyncio.sleep(4)
-                    #         continue
-
-                    # Idea -> prepare opps array with klines and TA analysis info and sort it by prev4HRsi ascending
-
-                    twoHoursOpps = []
-                    fourHoursOpps = []
-                    oneDayOpps = []
                     opps = []
                     for item in sortedTargets:
                         pair = item['symbol'] + "USDT"
                         if pair in usdt_tickers and pair not in excludedPairs:
-
                             # Initialize variables
                             prev4HKlineClose = None
                             prev4HKlineLow = None
@@ -337,16 +307,13 @@ async def main():
                                         break
                                     except:
                                         logger.info(f"{pair} | TAAPI Response (1D): {response.reason}. Trying again...")
-                                        await asyncio.sleep(3)
+                                        await asyncio.sleep(2)
                                         continue
 
                             # Get 4 hours tech info if the 4 hours candle is about to finish
                             if time.gmtime()[3] % 4 == 3 and time.gmtime()[4] >= 53:
                                 for _ in range(5):
                                     try:
-                                        # klines24Hours = bnb_exchange.get_historical_klines(pair, bnb_exchange.KLINE_INTERVAL_1HOUR, "24 hours ago UTC")
-                                        # sorted24HKlines = sorted(klines24Hours, key=lambda k: float(k[3]), reverse=False)
-                                        # lowest24HPrice = float(sorted24HKlines[0][3])
                                         klines4Hours = bnb_exchange.get_historical_klines(pair, bnb_exchange.KLINE_INTERVAL_4HOUR, "12 hours ago UTC")
                                         if float(klines4Hours[0][4]) - float(klines4Hours[0][1]) < 0:
                                             beforePrev4HKline = 'negative'
@@ -367,7 +334,7 @@ async def main():
                                         break
                                     except:
                                         logger.info(f"Retrying... ({pair})")
-                                        await asyncio.sleep(3)
+                                        await asyncio.sleep(2)
                                         continue
 
                                 # Get technical info
@@ -375,7 +342,6 @@ async def main():
                                 endpoint = "https://api.taapi.io/bulk"
 
                                 # Get 4H indicators
-                                # Define a JSON body with parameters to be sent to the API
                                 parameters = {
                                     "secret": config['taapi_api_key'],
                                     "construct": {
@@ -443,24 +409,9 @@ async def main():
                                         this4HStochFFastD = float(result['data'][5]['result']['valueFastD'])
                                         await asyncio.sleep(3)
                                         break
-
-                                        # rsi = result['data'][0]['result']['value']
-                                        # bLBand = result['data'][1]['result']['valueLowerBand']
-                                        # opps.append({
-                                        #     'pair': pair,
-                                        #     'current_value': float(item['quote']['USDT']['price']),
-                                        #     '24h_volume': float(item['quote']['USDT']['volume_24h']),
-                                        #     '1week_change': float(item['quote']['USDT']['percent_change_7d']),
-                                        #     '2hcandle_type': candleType,
-                                        #     '2hcandle_low': float(candle2HLow),
-                                        #     '2hcandle_close': float(candle2HClose),
-                                        #     '2hrsi': float(rsi),
-                                        #     '2hbolinger_lower_band': float(bLBand),
-                                        #     'cv_blb_ratio': float(item['quote']['USDT']['price']) / float(bLBand)
-                                        # })
                                     except:
                                         logger.info(f"{pair} | TAAPI Response (4H): {response.reason}. Trying again...")
-                                        await asyncio.sleep(5)
+                                        await asyncio.sleep(2)
                                         continue
                             # end if time.gmtime()[3] % 4 == 3 and time.gmtime()[4] >= 53
 
@@ -528,7 +479,6 @@ async def main():
                                 ):
                                     # Put 1D opportunities in opps dict
                                     opps.append({'pair': pair, 'interval': "1d", 'priority': 1})
-                                    # twoHoursOpps.append({'pair': pair})
                                     logger.info(f"{pair} good candidate for the 1 day strategy")
                                 elif (
                                     (time.gmtime()[3] % 4 == 3
@@ -559,7 +509,6 @@ async def main():
                                 ):
                                     # Put 4H opportunities in opps dict
                                     opps.append({'pair': pair, 'interval': "4h", 'priority': 2})
-                                    # twoHoursOpps.append({'pair': pair})
                                     logger.info(f"{pair} good candidate for one of the 4H strategies")
                                 elif (
                                     time.gmtime()[3] % 2 == 1
@@ -572,7 +521,6 @@ async def main():
                                 ):
                                     # Put 2H opportunities in opps dict
                                     opps.append({'pair': pair, 'interval': "2h", 'priority': 3})
-                                    # twoHoursOpps.append({'pair': pair})
                                     logger.info(f"{pair} good candidate for 2H low Stochastic Fast K stategy")
                                 else:
                                     logger.info(f"{pair} not a good entry point")
@@ -642,6 +590,16 @@ async def main():
                 # Wait given seconds until next poll
                 logger.info("Waiting for next iteration... ({} seconds)\n\n\n".format(config['seconds_between_iterations']))
                 await asyncio.sleep(config['seconds_between_iterations'])
+                # Update google sheet status field
+                dateStamp = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+                statusMessage = f"{dateStamp} -- Iteration {iteration}: Waiting for next iteration"
+                for _ in range(3):
+                    try:
+                        update_google_sheet_status(config['sheet_id'], statusMessage)
+                        break
+                    except:
+                        await asyncio.sleep(1)
+                        continue
         except Exception as e:
             logger.info(traceback.format_exc())
             # Network issue(s) occurred (most probably). Jumping to next iteration

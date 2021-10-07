@@ -587,9 +587,6 @@ async def main():
                 await asyncio.sleep(1)
                 break
             else:
-                # Wait given seconds until next poll
-                logger.info("Waiting for next iteration... ({} seconds)\n\n\n".format(config['seconds_between_iterations']))
-                await asyncio.sleep(config['seconds_between_iterations'])
                 # Update google sheet status field
                 dateStamp = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
                 statusMessage = f"{dateStamp} -- Iteration {iteration}: Waiting for next iteration"
@@ -600,6 +597,9 @@ async def main():
                     except:
                         await asyncio.sleep(1)
                         continue
+                # Wait given seconds until next poll
+                logger.info("Waiting for next iteration... ({} seconds)\n\n\n".format(config['seconds_between_iterations']))
+                await asyncio.sleep(config['seconds_between_iterations'])
         except Exception as e:
             logger.info(traceback.format_exc())
             # Network issue(s) occurred (most probably). Jumping to next iteration

@@ -552,7 +552,7 @@ async def main():
                                     and sim_trades > 0
                                 ):
                                     # Put 1D opportunities in opps dict
-                                    opps.append({'pair': pair, 'interval': "1d"})
+                                    opps.append({'pair': pair, 'interval': "1d", 'priority': 1})
                                     # twoHoursOpps.append({'pair': pair})
                                     logger.info(f"{pair} good candidate for the 1 day strategy")
                                 elif (
@@ -583,7 +583,7 @@ async def main():
                                     )
                                 ):
                                     # Put 4H opportunities in opps dict
-                                    opps.append({'pair': pair, 'interval': "4h"})
+                                    opps.append({'pair': pair, 'interval': "4h", 'priority': 2})
                                     # twoHoursOpps.append({'pair': pair})
                                     logger.info(f"{pair} good candidate for one of the 4H strategies")
                                 elif (
@@ -596,7 +596,7 @@ async def main():
                                     and sim_trades > 0
                                 ):
                                     # Put 2H opportunities in opps dict
-                                    opps.append({'pair': pair, 'interval': "2h"})
+                                    opps.append({'pair': pair, 'interval': "2h", 'priority': 3})
                                     # twoHoursOpps.append({'pair': pair})
                                     logger.info(f"{pair} good candidate for 2H low Stochastic Fast K stategy")
                                 else:
@@ -604,6 +604,8 @@ async def main():
                             except:
                                 logger.info(traceback.format_exc())
                                 logger.info(f"Problem with pair {pair}")
+                    # Sort opportunities based on priority
+                    opps = sorted(opps, key=lambda k: k['priority'])
                     logger.info("Opps ==========>")
                     logger.info(opps)
                     for opp in opps:

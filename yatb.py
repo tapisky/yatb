@@ -442,12 +442,14 @@ async def main():
                                         "optInFastK_Period": 3,
                                         "optInFastD_Period": 3
                                     },
+                                    {
                                         # Previous stoch fast
                                         "id": "prevstochf",
                                         "indicator": "stochf",
                                         "backtrack": 1,
                                         "optInFastK_Period": 3,
                                         "optInFastD_Period": 3
+                                    }
                                     ]
                                 }
                             }
@@ -2510,12 +2512,14 @@ def get_2h_tech_info(pair):
                 "optInFastK_Period": 3,
                 "optInFastD_Period": 3
             },
+            {
                 # Previous stoch fast
                 "id": "prevstochf",
                 "indicator": "stochf",
                 "backtrack": 1,
                 "optInFastK_Period": 3,
                 "optInFastD_Period": 3
+            }
             ]
         }
     }

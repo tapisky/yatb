@@ -547,88 +547,89 @@ async def main(config):
                     opps = sorted(opps, key=lambda k: k['priority'])
                     logger.info("Opps ==========>")
                     logger.info(opps)
-                    if opps[0]['interval'] in ['2h', '1d']:
-                        logger.info("Waiting until 90 seconds before candle close time to re-check indicators")
-                        candle_end = datetime.datetime(time.gmtime()[0], time.gmtime()[1], time.gmtime()[2], time.gmtime()[3] + 1 , 0, 0)
-                        now = datetime.datetime(time.gmtime()[0], time.gmtime()[1], time.gmtime()[2], time.gmtime()[3],time.gmtime()[4], time.gmtime()[5])
-                        seconds_to_candle_end = (candle_end - now).seconds
-                        # Update google sheet status field
-                        dateStamp = datetime_helper.now().strftime("%d/%m/%Y %H:%M:%S")
-                        statusMessage = f"{dateStamp} -- Iteration {iteration}: Waiting until 90 seconds before candle close"
-                        for _ in range(3):
-                            try:
-                                update_google_sheet_status(config['sheet_id'], statusMessage)
-                                break
-                            except:
-                                await asyncio.sleep(1)
-                                continue
-                        if seconds_to_candle_end > 90:
-                            await asyncio.sleep(seconds_to_candle_end - 90)
-                    for opp in opps:
-                        if sim_trades > 0:
-                            # If 2h opp, check again if techincal info is still ok; if not, skip this opp
-                            if opp['interval'] == '2h' and seconds_to_candle_end > 90:
-                                two_hours_tech_info = get_2h_tech_info(opp['pair'])
-                                logger.info(f"2H Data: {opp['pair']} | This RSI {str(round(two_hours_tech_info[0], 2))} | Prev StochF D {str(round(two_hours_tech_info[3], 2))} | This StochF K,D {str(round(two_hours_tech_info[1], 2))}|{str(round(two_hours_tech_info[2], 2))} | This Lower Bolinger {str(round(two_hours_tech_info[3], 4))}")
-                                if all(two_hours_tech_info):
-                                    if not (
-                                        two_hours_tech_info[0] < 69.0
-                                        and two_hours_tech_info[1] < 14.5
-                                        and two_hours_tech_info[1] < two_hours_tech_info[2]
-                                        and ((two_hours_tech_info[1] + 10.0 < two_hours_tech_info[2]
-                                            and two_hours_tech_info[2] > two_hours_tech_info[3] - 20.0
-                                            and two_hours_tech_info[2] > 28.0
-                                            and two_hours_tech_info[3] > 28.0)
-                                            or two_hours_tech_info[2] < 14.0
-                                            )
-                                    ):
-                                        logger.info(f"{opp['pair']}: Not a good chance in the end")
-                                        continue
-                                else:
-                                    logger.info("Could not verify if the 2H opportunity is still good near candle close time")
+                    if opps:
+                        if opps[0]['interval'] in ['2h', '1d']:
+                            logger.info("Waiting until 90 seconds before candle close time to re-check indicators")
+                            candle_end = datetime.datetime(time.gmtime()[0], time.gmtime()[1], time.gmtime()[2], time.gmtime()[3] + 1 , 0, 0)
+                            now = datetime.datetime(time.gmtime()[0], time.gmtime()[1], time.gmtime()[2], time.gmtime()[3],time.gmtime()[4], time.gmtime()[5])
+                            seconds_to_candle_end = (candle_end - now).seconds
+                            # Update google sheet status field
+                            dateStamp = datetime_helper.now().strftime("%d/%m/%Y %H:%M:%S")
+                            statusMessage = f"{dateStamp} -- Iteration {iteration}: Waiting until 90 seconds before candle close"
+                            for _ in range(3):
+                                try:
+                                    update_google_sheet_status(config['sheet_id'], statusMessage)
+                                    break
+                                except:
+                                    await asyncio.sleep(1)
                                     continue
-                            ongoingTradePairs.append({'pair': opp['pair'], 'expiryTime': time.time() + 5400.0})
-                            bnb_tickers = bnb_exchange.get_orderbook_tickers()
-                            bnb_ticker = next(item for item in bnb_tickers if item['symbol'] == opp['pair'])
-                            bnb_sell_price = bnb_ticker['askPrice']
-                            sell_price = ('%.8f' % float(bnb_sell_price)).rstrip('0').rstrip('.')
-                            if opp['interval'] == "1d":
-                                expectedProfitPercentage = 1.007
-                            elif opp['interval'] == "4h":
-                                expectedProfitPercentage = 1.0032
-                            else:
-                                expectedProfitPercentage = 1.0024
-                            expSellPrice = float(bnb_sell_price) * expectedProfitPercentage
-                            stopLoss = float(bnb_sell_price) - ((expSellPrice - float(bnb_sell_price)) * 1.5)
-                            fExpSellPrice = ('%.8f' % expSellPrice).rstrip('0').rstrip('.')
-                            if config['sim_mode_on']:
-                                # Simulate buy order
-                                quantity = round((float(config['trade_amount']) / float(bnb_sell_price)) * (1.0 - float(config['binance_trade_fee'])), 5)
-                                profit = round((float(quantity) * float(bnb_sell_price) * expectedProfitPercentage * (1.0 - float(config['binance_trade_fee'])) - config['trade_amount']), 3)
-                                trades.append({'pair': opp['pair'], 'type': 'sim', 'interval': opp['interval'], 'status': 'active', 'orderid': 0, 'time': time.time(), 'expirytime': time.time() + 43200.0, 'buyprice': float(bnb_sell_price), 'expsellprice': expSellPrice, 'stoploss': stopLoss, 'quantity': quantity})
-                                logger.info(f"<YATB SIM> [{opp['pair']}] Bought {str(config['trade_amount'])} @ {sell_price} = {str(quantity)}. Sell @ {fExpSellPrice}. Exp. Profit ~ {str(profit)} USDT")
-                                if config['telegram_notifications_on']:
-                                    telegram_bot_sendtext(config['telegram_bot_token'], config['telegram_user_id'], f"<YATB SIM> [{opp['pair']}] Bought {str(config['trade_amount'])} @ {sell_price} = {str(quantity)}. Sell @ {fExpSellPrice}. Exp. Profit ~ {str(profit)} USDT")
-                                simulation_balance = float(simulation_balance) - float(config['trade_amount'])
-                                sim_trades -= 1
-                            else:
-                                # Buy order
-                                # If available funds >= config['trade_ammount']
-                                bnb_balance_result = bnb_exchange.get_asset_balance(asset='USDT')
-                                if bnb_balance_result:
-                                    bnb_currency_available = bnb_balance_result['free']
+                            if seconds_to_candle_end > 90:
+                                await asyncio.sleep(seconds_to_candle_end - 90)
+                        for opp in opps:
+                            if sim_trades > 0:
+                                # If 2h opp, check again if techincal info is still ok; if not, skip this opp
+                                if opp['interval'] == '2h' and seconds_to_candle_end > 90:
+                                    two_hours_tech_info = get_2h_tech_info(opp['pair'])
+                                    logger.info(f"2H Data: {opp['pair']} | This RSI {str(round(two_hours_tech_info[0], 2))} | Prev StochF D {str(round(two_hours_tech_info[3], 2))} | This StochF K,D {str(round(two_hours_tech_info[1], 2))}|{str(round(two_hours_tech_info[2], 2))} | This Lower Bolinger {str(round(two_hours_tech_info[3], 4))}")
+                                    if all(two_hours_tech_info):
+                                        if not (
+                                            two_hours_tech_info[0] < 69.0
+                                            and two_hours_tech_info[1] < 14.5
+                                            and two_hours_tech_info[1] < two_hours_tech_info[2]
+                                            and ((two_hours_tech_info[1] + 10.0 < two_hours_tech_info[2]
+                                                and two_hours_tech_info[2] > two_hours_tech_info[3] - 20.0
+                                                and two_hours_tech_info[2] > 28.0
+                                                and two_hours_tech_info[3] > 28.0)
+                                                or two_hours_tech_info[2] < 14.0
+                                                )
+                                        ):
+                                            logger.info(f"{opp['pair']}: Not a good chance in the end")
+                                            continue
+                                    else:
+                                        logger.info("Could not verify if the 2H opportunity is still good near candle close time")
+                                        continue
+                                ongoingTradePairs.append({'pair': opp['pair'], 'expiryTime': time.time() + 5400.0})
+                                bnb_tickers = bnb_exchange.get_orderbook_tickers()
+                                bnb_ticker = next(item for item in bnb_tickers if item['symbol'] == opp['pair'])
+                                bnb_sell_price = bnb_ticker['askPrice']
+                                sell_price = ('%.8f' % float(bnb_sell_price)).rstrip('0').rstrip('.')
+                                if opp['interval'] == "1d":
+                                    expectedProfitPercentage = 1.007
+                                elif opp['interval'] == "4h":
+                                    expectedProfitPercentage = 1.0032
                                 else:
-                                    bnb_currency_available = 0.0
-                                sim_trades -= 1
-                                #if float(bnb_balance_result) >= config['trade_amount']:
-                                    # 1. Market buy
-                                    # 2. Create Stop loss order (percentage as per config) in order no to get rekt if price drops suddenly
-                                    # 3. Take note of the action so that we act accordingly later when monitoring
-                                    #trades.append({'orderid': , 'time': time.time(), , 'pair': pair})
-                                    # 4. Monitor the price in the next 8-10 hours max and sell when price is equal to result['valueLowerBand']
-                                    # if can sell, first you need to cancel Stop Loss order from step 2
-                                    # if 8-10 hours pass by and could not sell and Stop Loss did not get triggered,
-                                    # then cancel Stop Loss order and sell at current price and move on
+                                    expectedProfitPercentage = 1.0024
+                                expSellPrice = float(bnb_sell_price) * expectedProfitPercentage
+                                stopLoss = float(bnb_sell_price) - ((expSellPrice - float(bnb_sell_price)) * 1.5)
+                                fExpSellPrice = ('%.8f' % expSellPrice).rstrip('0').rstrip('.')
+                                if config['sim_mode_on']:
+                                    # Simulate buy order
+                                    quantity = round((float(config['trade_amount']) / float(bnb_sell_price)) * (1.0 - float(config['binance_trade_fee'])), 5)
+                                    profit = round((float(quantity) * float(bnb_sell_price) * expectedProfitPercentage * (1.0 - float(config['binance_trade_fee'])) - config['trade_amount']), 3)
+                                    trades.append({'pair': opp['pair'], 'type': 'sim', 'interval': opp['interval'], 'status': 'active', 'orderid': 0, 'time': time.time(), 'expirytime': time.time() + 43200.0, 'buyprice': float(bnb_sell_price), 'expsellprice': expSellPrice, 'stoploss': stopLoss, 'quantity': quantity})
+                                    logger.info(f"<YATB SIM> [{opp['pair']}] Bought {str(config['trade_amount'])} @ {sell_price} = {str(quantity)}. Sell @ {fExpSellPrice}. Exp. Profit ~ {str(profit)} USDT")
+                                    if config['telegram_notifications_on']:
+                                        telegram_bot_sendtext(config['telegram_bot_token'], config['telegram_user_id'], f"<YATB SIM> [{opp['pair']}] Bought {str(config['trade_amount'])} @ {sell_price} = {str(quantity)}. Sell @ {fExpSellPrice}. Exp. Profit ~ {str(profit)} USDT")
+                                    simulation_balance = float(simulation_balance) - float(config['trade_amount'])
+                                    sim_trades -= 1
+                                else:
+                                    # Buy order
+                                    # If available funds >= config['trade_ammount']
+                                    bnb_balance_result = bnb_exchange.get_asset_balance(asset='USDT')
+                                    if bnb_balance_result:
+                                        bnb_currency_available = bnb_balance_result['free']
+                                    else:
+                                        bnb_currency_available = 0.0
+                                    sim_trades -= 1
+                                    #if float(bnb_balance_result) >= config['trade_amount']:
+                                        # 1. Market buy
+                                        # 2. Create Stop loss order (percentage as per config) in order no to get rekt if price drops suddenly
+                                        # 3. Take note of the action so that we act accordingly later when monitoring
+                                        #trades.append({'orderid': , 'time': time.time(), , 'pair': pair})
+                                        # 4. Monitor the price in the next 8-10 hours max and sell when price is equal to result['valueLowerBand']
+                                        # if can sell, first you need to cancel Stop Loss order from step 2
+                                        # if 8-10 hours pass by and could not sell and Stop Loss did not get triggered,
+                                        # then cancel Stop Loss order and sell at current price and move on
                 else: #if sim_trades > 0 and time.localtime()[3] % 4 == 3 and time.localtime()[4] > 30:
                     logger.info("Waiting for the right time...")
             else: # if exchange_is_up:

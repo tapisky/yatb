@@ -83,6 +83,9 @@ async def main(config):
             # Update google sheet status field
             dateStamp = datetime_helper.now().strftime("%d/%m/%Y %H:%M:%S")
             statusMessage = f"{dateStamp} -- Iteration {iteration}"
+            if trades:
+                ongoing_trades = list(trade['pair'] + " " + trade['interval'] for trade in trades)
+                statusMessage += f" (Ongoing trades: {ongoing_trades})"
             for _ in range(5):
                 try:
                     update_google_sheet_status(config['sheet_id'], statusMessage)
@@ -439,6 +442,11 @@ async def main(config):
                                         "backtrack": 1,
                                         "optInFastK_Period": 3,
                                         "optInFastD_Period": 3
+                                    },
+                                    {
+                                        # Current Bolinger bands
+                                        "id": "thisbb",
+                                        "indicator": "bbands2"
                                     }
                                     ]
                                 }
@@ -456,6 +464,7 @@ async def main(config):
                                     this2HStochFFastK = float(result['data'][1]['result']['valueFastK'])
                                     this2HStochFFastD = float(result['data'][1]['result']['valueFastD'])
                                     prev2HStochFFastD = float(result['data'][2]['result']['valueFastD'])
+                                    this2HBolinger = float(result['data'][3]['result']['valueLowerBand'])
                                     await asyncio.sleep(2)
                                     break
                                 except:
@@ -468,7 +477,7 @@ async def main(config):
                                     logger.info(f"1D Data: {pair} | This RSI {str(round(this1DRsi, 2))} | This StochF K,D {str(round(this1DStochFFastK, 2))}|{str(round(this1DStochFFastD, 2))}")
                                 if time.gmtime()[3] % 4 == 3 and time.gmtime()[4] >= 53:
                                     logger.info(f"4H Data: {pair} | Prev Kline {str(prev4HKline)} | This Kline {str(this4HKline)} | Prev Kline Low {str(prev4HKlineLow)} | Prev Lower Bolinger {str(prev4HBolingerLowBand)} | Prev RSI {str(round(prev4HRsi, 2))} | This RSI {str(round(this4HRsi, 2))} | Prev StochF K,D {str(round(prev4HStochFFastK, 2))}|{str(round(prev4HStochFFastD, 2))} | This StochF K,D {str(round(this4HStochFFastK, 2))}|{str(round(this4HStochFFastD, 2))}")
-                                logger.info(f"2H Data: {pair} | This RSI {str(round(this2HRsi, 2))} | Prev StochF D {str(round(prev2HStochFFastD, 2))} | This StochF K,D {str(round(this2HStochFFastK, 2))}|{str(round(this2HStochFFastD, 2))}")
+                                logger.info(f"2H Data: {pair} | This RSI {str(round(this2HRsi, 2))} | Prev StochF D {str(round(prev2HStochFFastD, 2))} | This StochF K,D {str(round(this2HStochFFastK, 2))}|{str(round(this2HStochFFastD, 2))} | This Lower Bolinger {str(round(this2HBolinger, 4))}")
 
                                 if (
                                     time.gmtime()[3] % 24 == 23
@@ -518,7 +527,10 @@ async def main(config):
                                     and this2HRsi < 69.0
                                     and this2HStochFFastK < 14.5
                                     and this2HStochFFastK < this2HStochFFastD
-                                    and ((this2HStochFFastK + 10.0 < this2HStochFFastD and this2HStochFFastD > prev2HStochFFastD - 20.0)
+                                    and ((this2HStochFFastK + 10.0 < this2HStochFFastD
+                                        and this2HStochFFastD > prev2HStochFFastD - 20.0
+                                        and this2HStochFFastD > 28.0
+                                        and prev2HStochFFastD > 28.0)
                                         or this2HStochFFastD < 14.0
                                         )
                                     and sim_trades > 0
@@ -536,13 +548,13 @@ async def main(config):
                     logger.info("Opps ==========>")
                     logger.info(opps)
                     if opps[0]['interval'] in ['2h', '1d']:
-                        logger.info("Waiting until 45 seconds before candle close time to re-check indicators")
+                        logger.info("Waiting until 90 seconds before candle close time to re-check indicators")
                         candle_end = datetime.datetime(time.gmtime()[0], time.gmtime()[1], time.gmtime()[2], time.gmtime()[3] + 1 , 0, 0)
                         now = datetime.datetime(time.gmtime()[0], time.gmtime()[1], time.gmtime()[2], time.gmtime()[3],time.gmtime()[4], time.gmtime()[5])
                         seconds_to_candle_end = (candle_end - now).seconds
                         # Update google sheet status field
                         dateStamp = datetime_helper.now().strftime("%d/%m/%Y %H:%M:%S")
-                        statusMessage = f"{dateStamp} -- Iteration {iteration}: Waiting until 45 seconds before candle close"
+                        statusMessage = f"{dateStamp} -- Iteration {iteration}: Waiting until 90 seconds before candle close"
                         for _ in range(3):
                             try:
                                 update_google_sheet_status(config['sheet_id'], statusMessage)
@@ -550,20 +562,23 @@ async def main(config):
                             except:
                                 await asyncio.sleep(1)
                                 continue
-                        if seconds_to_candle_end > 45:
-                            await asyncio.sleep(seconds_to_candle_end - 45)
+                        if seconds_to_candle_end > 90:
+                            await asyncio.sleep(seconds_to_candle_end - 90)
                     for opp in opps:
                         if sim_trades > 0:
                             # If 2h opp, check again if techincal info is still ok; if not, skip this opp
-                            if opp['interval'] == '2h' and seconds_to_candle_end > 45:
+                            if opp['interval'] == '2h' and seconds_to_candle_end > 90:
                                 two_hours_tech_info = get_2h_tech_info(opp['pair'])
-                                logger.info(f"2H Data: {opp['pair']} | This RSI {str(round(two_hours_tech_info[0], 2))} | Prev StochF D {str(round(two_hours_tech_info[3], 2))} | This StochF K,D {str(round(two_hours_tech_info[1], 2))}|{str(round(two_hours_tech_info[2], 2))}")
+                                logger.info(f"2H Data: {opp['pair']} | This RSI {str(round(two_hours_tech_info[0], 2))} | Prev StochF D {str(round(two_hours_tech_info[3], 2))} | This StochF K,D {str(round(two_hours_tech_info[1], 2))}|{str(round(two_hours_tech_info[2], 2))} | This Lower Bolinger {str(round(two_hours_tech_info[3], 4))}")
                                 if all(two_hours_tech_info):
                                     if not (
                                         two_hours_tech_info[0] < 69.0
                                         and two_hours_tech_info[1] < 14.5
                                         and two_hours_tech_info[1] < two_hours_tech_info[2]
-                                        and ((two_hours_tech_info[1] + 10.0 < two_hours_tech_info[2] and two_hours_tech_info[2] > two_hours_tech_info[3] - 20.0)
+                                        and ((two_hours_tech_info[1] + 10.0 < two_hours_tech_info[2]
+                                            and two_hours_tech_info[2] > two_hours_tech_info[3] - 20.0
+                                            and two_hours_tech_info[2] > 28.0
+                                            and two_hours_tech_info[3] > 28.0)
                                             or two_hours_tech_info[2] < 14.0
                                             )
                                     ):
@@ -590,7 +605,7 @@ async def main(config):
                                 # Simulate buy order
                                 quantity = round((float(config['trade_amount']) / float(bnb_sell_price)) * (1.0 - float(config['binance_trade_fee'])), 5)
                                 profit = round((float(quantity) * float(bnb_sell_price) * expectedProfitPercentage * (1.0 - float(config['binance_trade_fee'])) - config['trade_amount']), 3)
-                                trades.append({'pair': opp['pair'], 'type': 'sim', 'interval': '2H', 'status': 'active', 'orderid': 0, 'time': time.time(), 'expirytime': time.time() + 43200.0, 'buyprice': float(bnb_sell_price), 'expsellprice': expSellPrice, 'stoploss': stopLoss, 'quantity': quantity})
+                                trades.append({'pair': opp['pair'], 'type': 'sim', 'interval': opp['interval'], 'status': 'active', 'orderid': 0, 'time': time.time(), 'expirytime': time.time() + 43200.0, 'buyprice': float(bnb_sell_price), 'expsellprice': expSellPrice, 'stoploss': stopLoss, 'quantity': quantity})
                                 logger.info(f"<YATB SIM> [{opp['pair']}] Bought {str(config['trade_amount'])} @ {sell_price} = {str(quantity)}. Sell @ {fExpSellPrice}. Exp. Profit ~ {str(profit)} USDT")
                                 if config['telegram_notifications_on']:
                                     telegram_bot_sendtext(config['telegram_bot_token'], config['telegram_user_id'], f"<YATB SIM> [{opp['pair']}] Bought {str(config['trade_amount'])} @ {sell_price} = {str(quantity)}. Sell @ {fExpSellPrice}. Exp. Profit ~ {str(profit)} USDT")
@@ -629,6 +644,9 @@ async def main(config):
                 # Update google sheet status field
                 dateStamp = datetime_helper.now().strftime("%d/%m/%Y %H:%M:%S")
                 statusMessage = f"{dateStamp} -- Iteration {iteration}: Waiting for next iteration"
+                if trades:
+                    ongoing_trades = list(trade['pair'] + " " + trade['interval'] for trade in trades)
+                    statusMessage += f" (Ongoing trades: {ongoing_trades})"
                 for _ in range(3):
                     try:
                         update_google_sheet_status(config['sheet_id'], statusMessage)
@@ -2490,6 +2508,7 @@ def get_2h_tech_info(pair):
     this2HStochFFastK = None
     this2HStochFFastD = None
     prev2HStochFFastD = None
+    this2HBolinger = None
     taapi_symbol = pair.split('USDT')[0] + "/" + "USDT"
     endpoint = "https://api.taapi.io/bulk"
 
@@ -2519,6 +2538,11 @@ def get_2h_tech_info(pair):
                 "backtrack": 1,
                 "optInFastK_Period": 3,
                 "optInFastD_Period": 3
+            },
+            {
+                # Current Bolinger bands
+                "id": "thisbb",
+                "indicator": "bbands2"
             }
             ]
         }
@@ -2536,13 +2560,14 @@ def get_2h_tech_info(pair):
             this2HStochFFastK = float(result['data'][1]['result']['valueFastK'])
             this2HStochFFastD = float(result['data'][1]['result']['valueFastD'])
             prev2HStochFFastD = float(result['data'][2]['result']['valueFastD'])
+            this2HBolinger = float(result['data'][3]['result']['valueLowerBand'])
             time.sleep(3)
             break
         except:
             logger.info(f"{pair} | TAAPI Response (2H): {response.reason}. Trying again...")
             time.sleep(2)
             continue
-    return this2HRsi, this2HStochFFastK, this2HStochFFastD, prev2HStochFFastD
+    return this2HRsi, this2HStochFFastK, this2HStochFFastD, prev2HStochFFastD, this2HBolinger
 
 loop = asyncio.get_event_loop()
 try:

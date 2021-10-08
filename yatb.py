@@ -2477,7 +2477,6 @@ def get_1d_tech_info(pair):
             this1DRsi = float(result['data'][0]['result']['value'])
             this1DStochFFastK = float(result['data'][1]['result']['valueFastK'])
             this1DStochFFastD = float(result['data'][1]['result']['valueFastD'])
-            await asyncio.sleep(2)
             break
         except:
             logger.info(f"{pair} | TAAPI Response (1D): {response.reason}. Trying again...")
@@ -2536,7 +2535,6 @@ def get_2h_tech_info(pair):
             this2HStochFFastK = float(result['data'][1]['result']['valueFastK'])
             this2HStochFFastD = float(result['data'][1]['result']['valueFastD'])
             prev2HStochFFastD = float(result['data'][2]['result']['valueFastD'])
-            await asyncio.sleep(2)
             break
         except:
             logger.info(f"{pair} | TAAPI Response (2H): {response.reason}. Trying again...")

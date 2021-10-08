@@ -12,6 +12,7 @@ import krakenex
 import pickle
 import os.path
 import requests
+import datetime
 
 from datetime import datetime
 from requests import Request, Session
@@ -213,8 +214,8 @@ async def main():
                             break
                         except (ConnectionError, Timeout, TooManyRedirects) as e:
                             logger.info(e)
-                            print("Retrying after 30 seconds...")
-                            await asyncio.sleep(30)
+                            print("Retrying after 10 seconds...")
+                            await asyncio.sleep(10)
                     targets = data['data']
                     sortedTargets = sorted(targets, key=lambda k: k['quote']['USDT']['percent_change_7d'], reverse=False)
                     logger.info(f"{str(len(targets))} target(s)...")
@@ -244,6 +245,7 @@ async def main():
                             this2HRsi = None
                             this2HStochFFastK = None
                             this2HStochFFastD = None
+                            prev2HStochFFastD = None
                             del prev4HKlineClose
                             del prev4HKlineLow
                             del this4HKlineClose
@@ -263,6 +265,7 @@ async def main():
                             del this2HRsi
                             del this2HStochFFastK
                             del this2HStochFFastD
+                            del prev2HStochFFastD
 
                             # Get 1 day tech info if the 1d candle is about to finish
                             if time.gmtime()[3] % 24 == 23 and time.gmtime()[4] >= 53:
@@ -303,7 +306,7 @@ async def main():
                                         this1DRsi = float(result['data'][0]['result']['value'])
                                         this1DStochFFastK = float(result['data'][1]['result']['valueFastK'])
                                         this1DStochFFastD = float(result['data'][1]['result']['valueFastD'])
-                                        await asyncio.sleep(3)
+                                        await asyncio.sleep(2)
                                         break
                                     except:
                                         logger.info(f"{pair} | TAAPI Response (1D): {response.reason}. Trying again...")
@@ -407,7 +410,7 @@ async def main():
                                         prev4HStochFFastD = float(result['data'][4]['result']['valueFastD'])
                                         this4HStochFFastK = float(result['data'][5]['result']['valueFastK'])
                                         this4HStochFFastD = float(result['data'][5]['result']['valueFastD'])
-                                        await asyncio.sleep(3)
+                                        await asyncio.sleep(2)
                                         break
                                     except:
                                         logger.info(f"{pair} | TAAPI Response (4H): {response.reason}. Trying again...")
@@ -438,7 +441,13 @@ async def main():
                                         "indicator": "stochf",
                                         "optInFastK_Period": 3,
                                         "optInFastD_Period": 3
-                                    }
+                                    },
+                                        # Previous stoch fast
+                                        "id": "prevstochf",
+                                        "indicator": "stochf",
+                                        "backtrack": 1,
+                                        "optInFastK_Period": 3,
+                                        "optInFastD_Period": 3
                                     ]
                                 }
                             }
@@ -454,11 +463,12 @@ async def main():
                                     this2HRsi = float(result['data'][0]['result']['value'])
                                     this2HStochFFastK = float(result['data'][1]['result']['valueFastK'])
                                     this2HStochFFastD = float(result['data'][1]['result']['valueFastD'])
-                                    await asyncio.sleep(3)
+                                    prev2HStochFFastD = float(result['data'][2]['result']['valueFastD'])
+                                    await asyncio.sleep(2)
                                     break
                                 except:
                                     logger.info(f"{pair} | TAAPI Response (2H): {response.reason}. Trying again...")
-                                    await asyncio.sleep(3)
+                                    await asyncio.sleep(2)
                                     continue
 
                             try:
@@ -466,7 +476,7 @@ async def main():
                                     logger.info(f"1D Data: {pair} | This RSI {str(round(this1DRsi, 2))} | This StochF K,D {str(round(this1DStochFFastK, 2))}|{str(round(this1DStochFFastD, 2))}")
                                 if time.gmtime()[3] % 4 == 3 and time.gmtime()[4] >= 53:
                                     logger.info(f"4H Data: {pair} | Prev Kline {str(prev4HKline)} | This Kline {str(this4HKline)} | Prev Kline Low {str(prev4HKlineLow)} | Prev Lower Bolinger {str(prev4HBolingerLowBand)} | Prev RSI {str(round(prev4HRsi, 2))} | This RSI {str(round(this4HRsi, 2))} | Prev StochF K,D {str(round(prev4HStochFFastK, 2))}|{str(round(prev4HStochFFastD, 2))} | This StochF K,D {str(round(this4HStochFFastK, 2))}|{str(round(this4HStochFFastD, 2))}")
-                                logger.info(f"2H Data: {pair} | This RSI {str(round(this2HRsi, 2))} | This StochF K,D {str(round(this2HStochFFastK, 2))}|{str(round(this2HStochFFastD, 2))}")
+                                logger.info(f"2H Data: {pair} | This RSI {str(round(this2HRsi, 2))} | Prev StochF D {str(round(prev2HStochFFastD, 2))} | This StochF K,D {str(round(this2HStochFFastK, 2))}|{str(round(this2HStochFFastD, 2))}")
 
                                 if (
                                     time.gmtime()[3] % 24 == 23
@@ -516,7 +526,9 @@ async def main():
                                     and this2HRsi < 69.0
                                     and this2HStochFFastK < 14.5
                                     and this2HStochFFastK < this2HStochFFastD
-                                    and this2HStochFFastK + 10.0 < this2HStochFFastD
+                                    and ((this2HStochFFastK + 10.0 < this2HStochFFastD and this2HStochFFastD > prev2HStochFFastD - 20.0)
+                                        or this2HStochFFastD < 14.0
+                                        )
                                     and sim_trades > 0
                                 ):
                                     # Put 2H opportunities in opps dict
@@ -533,6 +545,30 @@ async def main():
                     logger.info(opps)
                     for opp in opps:
                         if sim_trades > 0:
+                            # Wait until the end of the time of the candle interval if it's a 2h or 1d candle opportunity
+                            # because usually those are negative candles and it's usually better to buy as close as candle close time as possible
+                            if opp['interval'] in ['2h', '1d']:
+                                candle_end = datetime.datetime(time.gmtime()[0], time.gmtime()[1], time.gmtime()[2], time.gmtime()[3] + 1 , 0, 0)
+                                now = datetime.datetime(time.gmtime()[0], time.gmtime()[1], time.gmtime()[2], time.gmtime()[3],time.gmtime()[4], time.gmtime()[5])
+                                seconds_to_candle_end = (candle_end - now).seconds
+                                await asyncio.sleep(seconds_to_candle_end - 15)
+
+                            # If 2h opp, check again if techincal info is still ok; if not, skip this opp
+                            if opp['interval'] == '2h':
+                                two_hours_tech_info = get_2h_tech_info(opp['pair'])
+                                if all(two_hours_tech_info):
+                                    if not (
+                                        two_hours_tech_info[0] < 69.0
+                                        and two_hours_tech_info[1] < 14.5
+                                        and two_hours_tech_info[1] < two_hours_tech_info[2]
+                                        and ((two_hours_tech_info[1] + 10.0 < two_hours_tech_info[2] and two_hours_tech_info[2] > two_hours_tech_info[3] - 20.0)
+                                            or two_hours_tech_info[2] < 14.0
+                                            )
+                                    ):
+                                        break
+                                else:
+                                    logger.info("Could not verify if the 2H opportunity is still good near candle close time")
+                                    break
                             ongoingTradePairs.append({'pair': opp['pair'], 'expiryTime': time.time() + 5400.0})
                             bnb_tickers = bnb_exchange.get_orderbook_tickers()
                             bnb_ticker = next(item for item in bnb_tickers if item['symbol'] == opp['pair'])
@@ -543,13 +579,12 @@ async def main():
                             elif opp['interval'] == "4h":
                                 expectedProfitPercentage = 1.0032
                             else:
-                                expectedProfitPercentage = 1.0025
+                                expectedProfitPercentage = 1.0024
                             expSellPrice = float(bnb_sell_price) * expectedProfitPercentage
                             stopLoss = float(bnb_sell_price) - ((expSellPrice - float(bnb_sell_price)) * 1.5)
                             fExpSellPrice = ('%.8f' % expSellPrice).rstrip('0').rstrip('.')
                             if config['sim_mode_on']:
                                 # Simulate buy order
-                                sim_trades -= 1
                                 quantity = round((float(config['trade_amount']) / float(bnb_sell_price)) * (1.0 - float(config['binance_trade_fee'])), 5)
                                 profit = round((float(quantity) * float(bnb_sell_price) * expectedProfitPercentage * (1.0 - float(config['binance_trade_fee'])) - config['trade_amount']), 3)
                                 trades.append({'pair': opp['pair'], 'type': 'sim', 'interval': '2H', 'status': 'active', 'orderid': 0, 'time': time.time(), 'expirytime': time.time() + 43200.0, 'buyprice': float(bnb_sell_price), 'expsellprice': expSellPrice, 'stoploss': stopLoss, 'quantity': quantity})
@@ -557,15 +592,16 @@ async def main():
                                 if config['telegram_notifications_on']:
                                     telegram_bot_sendtext(config['telegram_bot_token'], config['telegram_user_id'], f"<YATB SIM> [{opp['pair']}] Bought {str(config['trade_amount'])} @ {sell_price} = {str(quantity)}. Sell @ {fExpSellPrice}. Exp. Profit ~ {str(profit)} USDT")
                                 simulation_balance = float(simulation_balance) - float(config['trade_amount'])
+                                sim_trades -= 1
                             else:
                                 # Buy order
-                                sim_trades -= 1
                                 # If available funds >= config['trade_ammount']
                                 bnb_balance_result = bnb_exchange.get_asset_balance(asset='USDT')
                                 if bnb_balance_result:
                                     bnb_currency_available = bnb_balance_result['free']
                                 else:
                                     bnb_currency_available = 0.0
+                                sim_trades -= 1
                                 #if float(bnb_balance_result) >= config['trade_amount']:
                                     # 1. Market buy
                                     # 2. Create Stop loss order (percentage as per config) in order no to get rekt if price drops suddenly
@@ -2398,10 +2434,126 @@ def get_simulation_balance(sheet_id):
     lastBalance = values[-1][0]
     return float(lastBalance)
 
+def get_1d_tech_info(pair):
+    this1DRsi = None
+    this1DStochFFastK = None
+    this1DStochFFastD = None
+    taapi_symbol = pair.split('USDT')[0] + "/" + "USDT"
+    endpoint = "https://api.taapi.io/bulk"
+
+    parameters = {
+        "secret": config['taapi_api_key'],
+        "construct": {
+            "exchange": "binance",
+            "symbol": taapi_symbol,
+            "interval": "1d",
+            "indicators": [
+            {
+                # Current Relative Strength Index
+                "id": "thisrsi",
+                "indicator": "rsi"
+            },
+            {
+                # Current stoch fast
+                "id": "thisstochf",
+                "indicator": "stochf",
+                "optInFastK_Period": 3,
+                "optInFastD_Period": 3
+            }
+            ]
+        }
+    }
+
+    for _ in range(5):
+        try:
+            # Send POST request and save the response as response object
+            response = requests.post(url = endpoint, json = parameters)
+
+            # Extract data in json format
+            result = response.json()
+
+            this1DRsi = float(result['data'][0]['result']['value'])
+            this1DStochFFastK = float(result['data'][1]['result']['valueFastK'])
+            this1DStochFFastD = float(result['data'][1]['result']['valueFastD'])
+            await asyncio.sleep(2)
+            break
+        except:
+            logger.info(f"{pair} | TAAPI Response (1D): {response.reason}. Trying again...")
+            await asyncio.sleep(2)
+            continue
+    return this1DRsi, this1DStochFFastK, this1DStochFFastD
+
+def get_2h_tech_info(pair):
+    this2HRsi = None
+    this2HStochFFastK = None
+    this2HStochFFastD = None
+    prev2HStochFFastD = None
+    taapi_symbol = pair.split('USDT')[0] + "/" + "USDT"
+    endpoint = "https://api.taapi.io/bulk"
+
+    parameters = {
+        "secret": config['taapi_api_key'],
+        "construct": {
+            "exchange": "binance",
+            "symbol": taapi_symbol,
+            "interval": "2h",
+            "indicators": [
+            {
+                # Current Relative Strength Index
+                "id": "thisrsi",
+                "indicator": "rsi"
+            },
+            {
+                # Current stoch fast
+                "id": "thisstochf",
+                "indicator": "stochf",
+                "optInFastK_Period": 3,
+                "optInFastD_Period": 3
+            },
+                # Previous stoch fast
+                "id": "prevstochf",
+                "indicator": "stochf",
+                "backtrack": 1,
+                "optInFastK_Period": 3,
+                "optInFastD_Period": 3
+            ]
+        }
+    }
+
+    for _ in range(5):
+        try:
+            # Send POST request and save the response as response object
+            response = requests.post(url = endpoint, json = parameters)
+
+            # Extract data in json format
+            result = response.json()
+
+            this2HRsi = float(result['data'][0]['result']['value'])
+            this2HStochFFastK = float(result['data'][1]['result']['valueFastK'])
+            this2HStochFFastD = float(result['data'][1]['result']['valueFastD'])
+            prev2HStochFFastD = float(result['data'][2]['result']['valueFastD'])
+            await asyncio.sleep(2)
+            break
+        except:
+            logger.info(f"{pair} | TAAPI Response (2H): {response.reason}. Trying again...")
+            await asyncio.sleep(2)
+            continue
+    return this2HRsi, this2HStochFFastK, this2HStochFFastD, prev2HStochFFastD
+
 loop = asyncio.get_event_loop()
 try:
     loop.run_until_complete(main())
 except KeyboardInterrupt:
+    # Update google sheet status field
+    dateStamp = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+    statusMessage = f"{dateStamp} -- Bot stopped"
+    for _ in range(5):
+        try:
+            update_google_sheet_status(config['sheet_id'], statusMessage)
+            break
+        except:
+            await asyncio.sleep(3)
+            continue
     pass
 finally:
     print("Stopping YATB...")

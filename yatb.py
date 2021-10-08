@@ -45,9 +45,6 @@ class Binance:
 async def main(config):
     iteration = 0
 
-    # config = get_config()
-    logger = setupLogger('logfile.log')
-
     stable_coins = ['USDCUSDT', 'PAXUSDT', 'ONGUSDT', 'TUSDUSDT', 'BUSDUSDT', 'ONTUSDT', 'GUSDUSDT', 'DGXUSDT', 'DAIUSDT']
 
     # Binance API setup
@@ -146,13 +143,6 @@ async def main(config):
                                 except:
                                     await asyncio.sleep(5)
                                     continue
-                            # for _ in range(5):
-                            #     try:
-                            #         update_sheet_trades_result(config['sheet_id'], trade['result'])
-                            #         break
-                            #     except:
-                            #         await asyncio.sleep(5)
-                            #         continue
                     else:
                         # Current trade is still valid
                         logger.info(f"<YATB> [{trade['pair']}] Trade ongoing:")
@@ -545,19 +535,29 @@ async def main(config):
                     opps = sorted(opps, key=lambda k: k['priority'])
                     logger.info("Opps ==========>")
                     logger.info(opps)
+                    if opps[0]['interval'] in ['2h', '1d']:
+                        logger.info("Waiting until 45 seconds before candle close time to re-check indicators")
+                        candle_end = datetime.datetime(time.gmtime()[0], time.gmtime()[1], time.gmtime()[2], time.gmtime()[3] + 1 , 0, 0)
+                        now = datetime.datetime(time.gmtime()[0], time.gmtime()[1], time.gmtime()[2], time.gmtime()[3],time.gmtime()[4], time.gmtime()[5])
+                        seconds_to_candle_end = (candle_end - now).seconds
+                        # Update google sheet status field
+                        dateStamp = datetime_helper.now().strftime("%d/%m/%Y %H:%M:%S")
+                        statusMessage = f"{dateStamp} -- Iteration {iteration}: Waiting until 45 seconds before candle close"
+                        for _ in range(3):
+                            try:
+                                update_google_sheet_status(config['sheet_id'], statusMessage)
+                                break
+                            except:
+                                await asyncio.sleep(1)
+                                continue
+                        if seconds_to_candle_end > 45:
+                            await asyncio.sleep(seconds_to_candle_end - 45)
                     for opp in opps:
                         if sim_trades > 0:
-                            # Wait until the end of the time of the candle interval if it's a 2h or 1d candle opportunity
-                            # because usually those are negative candles and it's usually better to buy as close as candle close time as possible
-                            if opp['interval'] in ['2h', '1d']:
-                                candle_end = datetime.datetime(time.gmtime()[0], time.gmtime()[1], time.gmtime()[2], time.gmtime()[3] + 1 , 0, 0)
-                                now = datetime.datetime(time.gmtime()[0], time.gmtime()[1], time.gmtime()[2], time.gmtime()[3],time.gmtime()[4], time.gmtime()[5])
-                                seconds_to_candle_end = (candle_end - now).seconds
-                                await asyncio.sleep(seconds_to_candle_end - 15)
-
                             # If 2h opp, check again if techincal info is still ok; if not, skip this opp
-                            if opp['interval'] == '2h':
+                            if opp['interval'] == '2h' and seconds_to_candle_end > 45:
                                 two_hours_tech_info = get_2h_tech_info(opp['pair'])
+                                logger.info(f"2H Data: {opp['pair']} | This RSI {str(round(two_hours_tech_info[0], 2))} | Prev StochF D {str(round(two_hours_tech_info[3], 2))} | This StochF K,D {str(round(two_hours_tech_info[1], 2))}|{str(round(two_hours_tech_info[2], 2))}")
                                 if all(two_hours_tech_info):
                                     if not (
                                         two_hours_tech_info[0] < 69.0
@@ -567,10 +567,11 @@ async def main(config):
                                             or two_hours_tech_info[2] < 14.0
                                             )
                                     ):
-                                        break
+                                        logger.info(f"{opp['pair']}: Not a good chance in the end")
+                                        continue
                                 else:
                                     logger.info("Could not verify if the 2H opportunity is still good near candle close time")
-                                    break
+                                    continue
                             ongoingTradePairs.append({'pair': opp['pair'], 'expiryTime': time.time() + 5400.0})
                             bnb_tickers = bnb_exchange.get_orderbook_tickers()
                             bnb_ticker = next(item for item in bnb_tickers if item['symbol'] == opp['pair'])
@@ -2535,6 +2536,7 @@ def get_2h_tech_info(pair):
             this2HStochFFastK = float(result['data'][1]['result']['valueFastK'])
             this2HStochFFastD = float(result['data'][1]['result']['valueFastD'])
             prev2HStochFFastD = float(result['data'][2]['result']['valueFastD'])
+            time.sleep(3)
             break
         except:
             logger.info(f"{pair} | TAAPI Response (2H): {response.reason}. Trying again...")
@@ -2544,6 +2546,7 @@ def get_2h_tech_info(pair):
 
 loop = asyncio.get_event_loop()
 try:
+    logger = setupLogger('logfile.log')
     config = get_config()
     loop.run_until_complete(main(config))
 except KeyboardInterrupt:

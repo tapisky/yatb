@@ -14,7 +14,7 @@ import os.path
 import requests
 import datetime
 
-from datetime import datetime
+from datetime import datetime as datetime_helper
 from requests import Request, Session
 from requests.exceptions import ConnectionError, Timeout, TooManyRedirects
 from os.path import exists
@@ -42,10 +42,10 @@ class Binance:
     def synced(self, fn_name, **args):
         args['timestamp'] = int(time.time() - self.time_offset)
 
-async def main():
+async def main(config):
     iteration = 0
 
-    config = get_config()
+    # config = get_config()
     logger = setupLogger('logfile.log')
 
     stable_coins = ['USDCUSDT', 'PAXUSDT', 'ONGUSDT', 'TUSDUSDT', 'BUSDUSDT', 'ONTUSDT', 'GUSDUSDT', 'DGXUSDT', 'DAIUSDT']
@@ -84,7 +84,7 @@ async def main():
             logger.info(trades)
 
             # Update google sheet status field
-            dateStamp = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+            dateStamp = datetime_helper.now().strftime("%d/%m/%Y %H:%M:%S")
             statusMessage = f"{dateStamp} -- Iteration {iteration}"
             for _ in range(5):
                 try:
@@ -177,7 +177,7 @@ async def main():
                     and time.gmtime()[4] < 58
                 ):
                     # Update google sheet status field
-                    dateStamp = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+                    dateStamp = datetime_helper.now().strftime("%d/%m/%Y %H:%M:%S")
                     statusMessage = f"{dateStamp} -- Iteration {iteration}: Looking for opportunities"
                     for _ in range(3):
                         try:
@@ -626,7 +626,7 @@ async def main():
                 break
             else:
                 # Update google sheet status field
-                dateStamp = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+                dateStamp = datetime_helper.now().strftime("%d/%m/%Y %H:%M:%S")
                 statusMessage = f"{dateStamp} -- Iteration {iteration}: Waiting for next iteration"
                 for _ in range(3):
                     try:
@@ -2544,10 +2544,14 @@ def get_2h_tech_info(pair):
 
 loop = asyncio.get_event_loop()
 try:
-    loop.run_until_complete(main())
+    config = get_config()
+    loop.run_until_complete(main(config))
 except KeyboardInterrupt:
+    pass
+finally:
+    print("Stopping YATB...")
     # Update google sheet status field
-    dateStamp = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+    dateStamp = datetime_helper.now().strftime("%d/%m/%Y %H:%M:%S")
     statusMessage = f"{dateStamp} -- Bot stopped"
     for _ in range(5):
         try:
@@ -2556,7 +2560,4 @@ except KeyboardInterrupt:
         except:
             time.sleep(3)
             continue
-    pass
-finally:
-    print("Stopping YATB...")
     loop.close()

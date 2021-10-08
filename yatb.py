@@ -2481,7 +2481,7 @@ def get_1d_tech_info(pair):
             break
         except:
             logger.info(f"{pair} | TAAPI Response (1D): {response.reason}. Trying again...")
-            await asyncio.sleep(2)
+            time.sleep(2)
             continue
     return this1DRsi, this1DStochFFastK, this1DStochFFastD
 
@@ -2540,7 +2540,7 @@ def get_2h_tech_info(pair):
             break
         except:
             logger.info(f"{pair} | TAAPI Response (2H): {response.reason}. Trying again...")
-            await asyncio.sleep(2)
+            time.sleep(2)
             continue
     return this2HRsi, this2HStochFFastK, this2HStochFFastD, prev2HStochFFastD
 
@@ -2556,7 +2556,7 @@ except KeyboardInterrupt:
             update_google_sheet_status(config['sheet_id'], statusMessage)
             break
         except:
-            await asyncio.sleep(3)
+            time.sleep(3)
             continue
     pass
 finally:

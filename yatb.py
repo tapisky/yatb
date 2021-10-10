@@ -528,7 +528,7 @@ async def main(config):
                                     and this2HStochFFastK < 14.5
                                     and this2HStochFFastK < this2HStochFFastD
                                     and ((this2HStochFFastK + 10.0 < this2HStochFFastD
-                                        and this2HStochFFastD > prev2HStochFFastD - 20.0
+                                        and this2HStochFFastD > prev2HStochFFastD - 15.0
                                         and this2HStochFFastD > 28.0
                                         and prev2HStochFFastD > 28.0)
                                         or this2HStochFFastD < 14.0
@@ -577,7 +577,7 @@ async def main(config):
                                             and two_hours_tech_info[1] < 14.5
                                             and two_hours_tech_info[1] < two_hours_tech_info[2]
                                             and ((two_hours_tech_info[1] + 10.0 < two_hours_tech_info[2]
-                                                and two_hours_tech_info[2] > two_hours_tech_info[3] - 20.0
+                                                and two_hours_tech_info[2] > two_hours_tech_info[3] - 15.0
                                                 and two_hours_tech_info[2] > 28.0
                                                 and two_hours_tech_info[3] > 28.0)
                                                 or two_hours_tech_info[2] < 14.0

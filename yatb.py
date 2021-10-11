@@ -525,14 +525,13 @@ async def main(config):
                                     time.gmtime()[3] % 2 == 1
                                     and time.gmtime()[4] >= 53
                                     and this2HRsi < 69.0
+                                    and this2HRsi > 40.0
                                     and this2HStochFFastK < 14.5
                                     and this2HStochFFastK < this2HStochFFastD
-                                    and ((this2HStochFFastK + 10.0 < this2HStochFFastD
+                                    and (this2HStochFFastK + 10.0 < this2HStochFFastD
                                         and this2HStochFFastD > prev2HStochFFastD - 15.0
                                         and this2HStochFFastD > 28.0
                                         and prev2HStochFFastD > 28.0)
-                                        or this2HStochFFastD < 14.0
-                                        )
                                     and sim_trades > 0
                                 ):
                                     # Put 2H opportunities in opps dict
@@ -574,14 +573,13 @@ async def main(config):
                                     if all(two_hours_tech_info):
                                         if not (
                                             two_hours_tech_info[0] < 69.0
+                                            and two_hours_tech_info[0] > 40.0
                                             and two_hours_tech_info[1] < 14.5
                                             and two_hours_tech_info[1] < two_hours_tech_info[2]
-                                            and ((two_hours_tech_info[1] + 10.0 < two_hours_tech_info[2]
+                                            and (two_hours_tech_info[1] + 10.0 < two_hours_tech_info[2]
                                                 and two_hours_tech_info[2] > two_hours_tech_info[3] - 15.0
                                                 and two_hours_tech_info[2] > 28.0
                                                 and two_hours_tech_info[3] > 28.0)
-                                                or two_hours_tech_info[2] < 14.0
-                                                )
                                         ):
                                             logger.info(f"{opp['pair']}: Not a good chance in the end")
                                             continue

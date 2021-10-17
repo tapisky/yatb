@@ -8,7 +8,6 @@ import sys
 import traceback
 import json
 import cryptocom.exchange as cro
-import krakenex
 import pickle
 import os.path
 import requests
@@ -18,52 +17,38 @@ from datetime import datetime as datetime_helper
 from requests import Request, Session
 from requests.exceptions import ConnectionError, Timeout, TooManyRedirects
 from os.path import exists
-from cryptocom.exchange.structs import Pair
-from cryptocom.exchange.structs import PrivateTrade
-from binance.client import Client as Client
-from binance.exceptions import *
+from analyzer import Analyzer
+from exchanger import Exchanger
 from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 
-# Wrapper for Binance API (helps getting through the recvWindow issue)
-class Binance:
-    def __init__(self, public_key = '', secret_key = '', sync = False):
-        self.time_offset = 0
-        self.b = Client(public_key, secret_key)
-
-        if sync:
-            self.time_offset = self._get_time_offset()
-
-    def _get_time_offset(self):
-        res = self.b.get_server_time()
-        return res['serverTime'] - int(time.time() * 1000)
-
-    def synced(self, fn_name, **args):
-        args['timestamp'] = int(time.time() - self.time_offset)
+STABLE_COINS = ['USDCUSDT', 'PAXUSDT', 'ONGUSDT', 'TUSDUSDT', 'BUSDUSDT', 'ONTUSDT', 'GUSDUSDT', 'DGXUSDT', 'DAIUSDT']
 
 async def main(config):
     iteration = 0
 
-    stable_coins = ['USDCUSDT', 'PAXUSDT', 'ONGUSDT', 'TUSDUSDT', 'BUSDUSDT', 'ONTUSDT', 'GUSDUSDT', 'DGXUSDT', 'DAIUSDT']
 
     # Binance API setup
-    binance = Binance(public_key=config['bnb_api_key'], secret_key=config['bnb_api_secret'], sync=True)
-    bnb_exchange = binance.b
+    exchanger = Exchanger(config)
+    bnb_exchange = exchanger.account
 
     # Setup Binance availble USDT pairs
     tickers = bnb_exchange.get_all_tickers()
     usdt_tickers = [item for item in tickers if 'USDT' in item['symbol']]
 
     # Remove Stable coins
-    usdt_tickers = [item for item in usdt_tickers if item['symbol'] not in stable_coins]
+    usdt_tickers = [item for item in usdt_tickers if item['symbol'] not in STABLE_COINS]
     usdt_tickers = list(map(lambda x: x['symbol'], usdt_tickers))
 
     simulation_balance = get_simulation_balance(config['sheet_id'])
     logger.info(f"Simulation balance start = {simulation_balance}")
 
-    # TAAPI API setup
-    # TBD
+    # Coin Market Cap Analyzer setup
+    analyzer = Analyzer(config, logger)
+
+    # TAAPI Tech Analysis setup
+
     trades = []
     ongoingTradePairs = []
 
@@ -1966,48 +1951,7 @@ def get_config():
     config_file = open(config_path)
     data = yaml.load(config_file, Loader=yaml.FullLoader)
     config_file.close()
-    check_config(data)
     return data
-
-def check_config(data):
-    # Check Crypto.com trading pair and coins
-    try:
-        eval('cro.pairs.' + data['cdc_trading_pair'])
-    except AttributeError:
-        print("Crypto.com's trading pair '{}' does not exist (check your config_file)".format(data['cdc_trading_pair']))
-        sys.exit(1)
-    try:
-        eval('cro.coins.' + data['cdc_target_currency'])
-    except AttributeError:
-        print('Currency "{}" does not exist (check your config_file)'.format(data['cdc_target_currency']))
-        sys.exit(1)
-    try:
-        eval('cro.coins.' + data['cdc_base_currency'])
-    except AttributeError:
-        print('Currency "{}" does not exist (check your config_file)'.format(data['cdc_base_currency']))
-        sys.exit(1)
-
-    # Check kraken trading pair and coins
-    try:
-        krk_x = krakenex.API(key='', secret='')
-        result = krk_x.query_public("Ticker", {'pair': data['krk_trading_pair']})
-        if result['error'] != [] and result['error'][0] == 'EQuery:Unknown asset pair':
-            raise AttributeError
-    except AttributeError:
-        print("Kraken's Trading pair '{}' does not exist (check your config_file)".format(data['krk_trading_pair']))
-        sys.exit(1)
-    print('All options looking good\n')
-
-def get_kraken_balances(exchange, config):
-    krk_balance = exchange.query_private('Balance')
-    krk_base_currency_available = 0.0
-    if config['krk_base_currency'] in krk_balance['result']:
-        krk_base_currency_available = krk_balance['result'][config['krk_base_currency']]
-    # Kraken: Get my target currency balance
-    krk_target_currency_available = 0.0
-    if config['krk_target_currency'] in krk_balance['result']:
-        krk_target_currency_available = krk_balance['result'][config['krk_target_currency']]
-    return ({'krk_base_currency_available': krk_base_currency_available, 'krk_target_currency_available': krk_target_currency_available})
 
 def get_binance_balances(exchange, config):
     bnb_balance_result = exchange.get_asset_balance(asset=config['bnb_base_currency'])

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 import asyncio
 import time
 import logging
@@ -587,47 +586,148 @@ async def main(config):
                                         logger.info("Could not verify if the 2H opportunity is still good near candle close time")
                                         continue
                                 ongoingTradePairs.append({'pair': opp['pair'], 'expiryTime': time.time() + 5400.0})
-                                bnb_tickers = bnb_exchange.get_orderbook_tickers()
-                                bnb_ticker = next(item for item in bnb_tickers if item['symbol'] == opp['pair'])
-                                bnb_sell_price = bnb_ticker['askPrice']
-                                sell_price = ('%.8f' % float(bnb_sell_price)).rstrip('0').rstrip('.')
                                 if opp['interval'] == "1d":
                                     expectedProfitPercentage = 1.007
                                 elif opp['interval'] == "4h":
-                                    expectedProfitPercentage = 1.0032
+                                    expectedProfitPercentage = 1.003
                                 else:
-                                    expectedProfitPercentage = 1.0024
-                                expSellPrice = float(bnb_sell_price) * expectedProfitPercentage
-                                stopLoss = float(bnb_sell_price) - ((expSellPrice - float(bnb_sell_price)) * 1.5)
-                                fExpSellPrice = ('%.8f' % expSellPrice).rstrip('0').rstrip('.')
+                                    expectedProfitPercentage = 1.002
+                                bnb_tickers = bnb_exchange.get_orderbook_tickers()
+                                bnb_ticker = next(item for item in bnb_tickers if item['symbol'] == opp['pair'])
+                                bnb_buy_price = bnb_ticker['bidPrice']
+                                # buy_price = ('%.8f' % float(bnb_buy_price)).rstrip('0').rstrip('.')
+                                info = bnb_exchange.get_symbol_info(opp['pair'])
+                                stepSize = info['filters'][2]['stepSize']
+                                pair_num_decimals = stepSize.find('1')
+                                expSellPrice = round(float(bnb_buy_price) * expectedProfitPercentage, pair_num_decimals - 1)
+                                expBuyPrice = str(bnb_buy_price)
+                                expBuyPrice = float(expBuyPrice[0:expBuyPrice.find('.') + pair_num_decimals])
+                                stopLoss = float(bnb_buy_price) - ((expSellPrice - float(bnb_buy_price)) * 1.5)
+                                # fExpSellPrice = ('%.8f' % expSellPrice).rstrip('0').rstrip('.')
                                 if config['sim_mode_on']:
                                     # Simulate buy order
-                                    quantity = round((float(config['trade_amount']) / float(bnb_sell_price)) * (1.0 - float(config['binance_trade_fee'])), 5)
-                                    profit = round((float(quantity) * float(bnb_sell_price) * expectedProfitPercentage * (1.0 - float(config['binance_trade_fee'])) - config['trade_amount']), 3)
-                                    trades.append({'pair': opp['pair'], 'type': 'sim', 'interval': opp['interval'], 'status': 'active', 'orderid': 0, 'time': time.time(), 'expirytime': time.time() + 43200.0, 'buyprice': float(bnb_sell_price), 'expsellprice': expSellPrice, 'stoploss': stopLoss, 'quantity': quantity})
-                                    logger.info(f"<YATB SIM> [{opp['pair']}] Bought {str(config['trade_amount'])} @ {sell_price} = {str(quantity)}. Sell @ {fExpSellPrice}. Exp. Profit ~ {str(profit)} USDT")
+                                    quantity = round((float(config['trade_amount']) / float(bnb_buy_price)) * (1.0 - float(config['binance_trade_fee'])), 5)
+                                    profit = round((float(quantity) * float(bnb_buy_price) * expectedProfitPercentage * (1.0 - float(config['binance_trade_fee'])) - config['trade_amount']), 3)
+                                    trades.append({'pair': opp['pair'], 'type': 'sim', 'interval': opp['interval'], 'status': 'active', 'orderid': 0, 'time': time.time(), 'expirytime': time.time() + 43200.0, 'buyprice': float(bnb_buy_price), 'expsellprice': expSellPrice, 'stoploss': stopLoss, 'quantity': quantity})
+                                    logger.info(f"<YATB SIM> [{opp['pair']}] Bought {str(config['trade_amount'])} @ {bnb_buy_price} = {str(quantity)}. Sell @ {str(expSellPrice)}. Exp. Profit ~ {str(profit)} USDT")
                                     if config['telegram_notifications_on']:
-                                        telegram_bot_sendtext(config['telegram_bot_token'], config['telegram_user_id'], f"<YATB SIM> [{opp['pair']}] Bought {str(config['trade_amount'])} @ {sell_price} = {str(quantity)}. Sell @ {fExpSellPrice}. Exp. Profit ~ {str(profit)} USDT")
+                                        telegram_bot_sendtext(config['telegram_bot_token'], config['telegram_user_id'], f"<YATB SIM> [{opp['pair']}] Bought {str(config['trade_amount'])} @ {bnb_buy_price} = {str(quantity)}. Sell @ {str(expSellPrice)}. Exp. Profit ~ {str(profit)} USDT")
                                     simulation_balance = float(simulation_balance) - float(config['trade_amount'])
                                     sim_trades -= 1
                                 else:
                                     # Buy order
-                                    # If available funds >= config['trade_ammount']
                                     bnb_balance_result = bnb_exchange.get_asset_balance(asset='USDT')
                                     if bnb_balance_result:
                                         bnb_currency_available = bnb_balance_result['free']
                                     else:
                                         bnb_currency_available = 0.0
-                                    sim_trades -= 1
-                                    #if float(bnb_balance_result) >= config['trade_amount']:
-                                        # 1. Market buy
-                                        # 2. Create Stop loss order (percentage as per config) in order no to get rekt if price drops suddenly
-                                        # 3. Take note of the action so that we act accordingly later when monitoring
-                                        #trades.append({'orderid': , 'time': time.time(), , 'pair': pair})
-                                        # 4. Monitor the price in the next 8-10 hours max and sell when price is equal to result['valueLowerBand']
-                                        # if can sell, first you need to cancel Stop Loss order from step 2
-                                        # if 8-10 hours pass by and could not sell and Stop Loss did not get triggered,
-                                        # then cancel Stop Loss order and sell at current price and move on
+                                    quantity = str(bnb_currency_available)
+                                    price = str(expBuyPrice - (float(stepSize) * 5))
+                                    for _ in range(10):
+                                        try:
+                                            result_bnb = bnb_exchange.order_limit_buy(symbol=opp['pair'], quantity=quantity, price=price)
+                                            logger.info(result_bnb)
+                                            # trades.append({'pair': opp['pair'], 'type': 'real', 'interval': opp['interval'], 'status': 'active', 'orderid': 0, 'time': time.time(), 'expirytime': time.time() + 43200.0, 'buyprice': float(bnb_buy_price), 'expsellprice': expSellPrice, 'stoploss': stopLoss, 'quantity': quantity})
+                                            break
+                                        except:
+                                            logger.info(traceback.format_exc())
+                                            continue
+
+                                    # Wait 10 seconds to give exchanges time to process orders
+                                    logger.info('Waiting 20 seconds to give exchanges time to process orders...')
+                                    if config['telegram_notifications_on']:
+                                        telegram_bot_sendtext(config['telegram_bot_token'], config['telegram_user_id'], f"<YATB> [{opp['pair']}]: limit orders sent and waiting for fulfillment...")
+                                    await asyncio.sleep(20)
+
+                                    ################################################################################################################################################
+                                    # Wait until limit orders have been fulfilled
+                                    ################################################################################################################################################
+                                    limit_orders_closed = await wait_for_bnb_order(config, bnb_exchange, logger)
+                                    if not limit_orders_closed:
+                                        # if config['telegram_notifications_on']:
+                                        #     telegram_bot_sendtext(config['telegram_bot_token'], config['telegram_user_id'], f"<Arbitrito> [{item['pair']}] Opportunity of {str(round(float(item['spread']), 5))} found! (Max buy {item['max_buy_price_key']} | Min sell {item['min_sell_price_key']} ): At least 1 limit order could not be fulfilled after {config['limit_order_time']} seconds. You must find a recover way!")
+                                        # raise Exception("Limit orders not fulfilled!")
+
+                                        # Cancel open orders
+                                        for _ in range (10):
+                                            try:
+                                                result_bnb = bnb_exchange.cancel_order(symbol=opp['pair'], orderId=result_bnb['orderId'])
+                                                logger.info(result_bnb)
+                                                break
+                                            except:
+                                                logger.info(traceback.format_exc())
+                                                # wait a few seconds before trying again
+                                                await asyncio.sleep(2)
+                                                continue
+
+                                        # Re-try trade until success
+                                        tries = 100
+                                        success = False
+                                        first_try = True
+                                        while tries >= 0 and not success:
+                                            try:
+                                                logger.info("Trying to limit buy in Binance...")
+                                                tries -= 1
+
+                                                # calculate trade_amount
+                                                bnb_balance_result = bnb_exchange.get_asset_balance(asset='USDT')
+                                                if bnb_balance_result:
+                                                    bnb_currency_available = bnb_balance_result['free']
+                                                else:
+                                                    bnb_currency_available = 0.0
+
+                                                # Get latest ticker info
+                                                bnb_tickers = bnb_exchange.get_orderbook_tickers()
+                                                bnb_ticker = next(item for item in bnb_tickers if item['symbol'] == opp['pair'])
+                                                bnb_buy_price = bnb_ticker['bidPrice']
+
+                                                quantity = str(bnb_currency_available)
+                                                expBuyPrice = str(bnb_buy_price)
+                                                expBuyPrice = float(expBuyPrice[0:expBuyPrice.find('.') + pair_num_decimals])
+                                                price = str(expBuyPrice - (float(stepSize) * 3))
+                                                # if usdt_already_spent >= (float(config['trade_amount']) - 60) and not first_try:
+                                                if float(quantity) <= 5.0 and not first_try:
+                                                    success = True
+                                                else:
+                                                    result_bnb = bnb_exchange.order_limit_buy(symbol=opp['pair'], quantity=quantity, price=str(price))
+                                                    logger.info(result_bnb)
+                                                    trades.append({'exchange': 'bnb', 'orderid': result_bnb['orderId'], 'time': time.time(), 'spread': item['spread']})
+                                                    logger.info(result_krk)
+                                                    if result_bnb:
+                                                        first_try = False
+                                                    limit_order_successful = await short_wait_for_bnb_order(opp['pair'], result_bnb['orderId'], config, bnb_exchange, logger)
+                                                    success = limit_order_successful
+                                            except:
+                                                logger.info(traceback.format_exc())
+                                                # wait a few seconds before trying again
+                                                await asyncio.sleep(2)
+                                                continue
+
+                                        if not success:
+                                            if config['telegram_notifications_on']:
+                                                telegram_bot_sendtext(config['telegram_bot_token'], config['telegram_user_id'], f"<Arbitrito> [USDTEUR] Error when buying in Binance")
+                                                # telegram_bot_sendtext(config['telegram_bot_token'], config['telegram_user_id'], f"<Arbitrito> [{pair_coins[candidates[0]['pair']]['bnb_base']}] Error when selling in Kraken")
+                                            raise Exception(f"[USDTEUR] Error when buying in Binance")
+                                        else:
+                                            # Create limit sell order
+                                            for _ in range(30):
+                                                try:
+                                                    # calculate trade_amount
+                                                    bnb_balance_result = bnb_exchange.get_asset_balance(asset=opp['pair'].replace('USDT',''))
+                                                    if bnb_balance_result:
+                                                        bnb_currency_available = bnb_balance_result['free']
+                                                    else:
+                                                        bnb_currency_available = 0.0
+
+                                                    result_bnb = bnb_exchange.order_limit_sell(symbol=opp['pair'], quantity=quantity, price=expSellPrice)
+                                                    logger.info(result_bnb)
+                                                    trades.append({'pair': opp['pair'], 'type': 'real', 'interval': opp['interval'], 'status': 'active', 'orderid': result_bnb['orderId'], 'time': time.time(), 'expirytime': time.time() + 43200.0, 'buyprice': float(bnb_buy_price), 'expsellprice': expSellPrice, 'stoploss': stopLoss, 'quantity': quantity})
+                                                    sim_trades -= 1
+                                                    break
+                                                except:
+                                                    logger.info(traceback.format_exc())
+                                                    await asyncio.sleep(3)
+                                                    continue
                 else: #if sim_trades > 0 and time.localtime()[3] % 4 == 3 and time.localtime()[4] > 30:
                     logger.info("Waiting for the right time...")
             else: # if exchange_is_up:
@@ -2094,40 +2194,22 @@ async def wait_for_orders(trades, config, krk_exchange, bnb_exchange, pair, logg
             telegram_bot_sendtext(config['telegram_bot_token'], config['telegram_user_id'], f"<Arbitrito> [{pair}] Waited more than {config['limit_order_time']} seconds for limit orders unsuccessfully")
         return False
 
-async def wait_for_bnb_order(trades, config, bnb_exchange, logger):
+async def wait_for_bnb_order(config, bnb_exchange, logger):
     logger.info("Waiting for limit orders...")
     if config['telegram_notifications_on']:
-        telegram_bot_sendtext(config['telegram_bot_token'], config['telegram_user_id'], f"<Arbitrito> [{trades[0]['pair']}] Waiting for 2nd limit order...")
+        telegram_bot_sendtext(config['telegram_bot_token'], config['telegram_user_id'], f"<YATB> Waiting for limit orders...")
+    await asyncio.sleep(config['limit_order_time'])
     # Check if there are trades to cancel
     bnb_open_orders = bnb_exchange.get_open_orders()
-    logger.info(f'Binance open trades: {bnb_open_orders}')
-    success = False
-    now = time.time()
-    start_time = now
-    while now - start_time < config['limit_order_time'] and bnb_open_orders:
-        logger.info(f"Waiting now {str(int((now - start_time)))} seconds")
-        await asyncio.sleep(10)
-        tries = 10
-        success = False
-        while tries >= 0 and not success:
-            try:
-                tries = tries - 1
-                bnb_open_orders = bnb_exchange.get_open_orders()
-                logger.info(f'Binance open trades: {bnb_open_orders}')
-                success = True
-                await asyncio.sleep(5)
-            except:
-                logger.info(traceback.format_exc())
-                # wait a few seconds before trying again
-                await asyncio.sleep(5)
-                continue
+    if bnb_open_orders:
+        return True
+    else:
+        return False
 
-        now = time.time()
-    return success
 
-async def short_wait_for_bnb_order(trades, config, bnb_exchange, logger):
+async def short_wait_for_bnb_order(pair, order_id, config, bnb_exchange, logger):
     logger.info("Waiting for limit order (Binance)...")
-    await asyncio.sleep(30)
+    await asyncio.sleep(10)
     # Check if there are trades to cancel
     bnb_open_orders = bnb_exchange.get_open_orders()
     logger.info(f'Binance open trades: {bnb_open_orders}')
@@ -2135,13 +2217,14 @@ async def short_wait_for_bnb_order(trades, config, bnb_exchange, logger):
     if bnb_open_orders:
         for _ in range(50):
             try:
-                result_bnb = bnb_exchange.cancel_order(symbol=trades[0]['pair'], orderId=trades[0]['orderid'])
-                logger.info(f"Cancelled order {trades[0]['orderid']}")
+                result_bnb = bnb_exchange.cancel_order(symbol=pair, orderId=order_id)
+                logger.info(f"Cancelled order {str(orderid)}")
                 success = False
                 break
             except BinanceAPIException as e:
                 logger.info(e.message)
                 if "Unknown order sent" in e.message:
+                    success = True
                     break
             except:
                 logger.info(traceback.format_exc())

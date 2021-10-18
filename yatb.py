@@ -169,33 +169,7 @@ async def main(config):
                     # Get Coin Market Cap data: assets with a negative 24h percentage and a minimum 24h volume of $50 millions
                     logger.info("Checking market status...")
 
-                    url = 'https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest'
-                    parameters = {
-                        'start':'1',
-                        'limit':'32',
-                        'convert':'USDT',
-                        'market_cap_min': 2000000000,
-                        'volume_24h_min': 35000000
-                    }
-                    headers = {
-                        'Accepts': 'application/json',
-                        'X-CMC_PRO_API_KEY': config['cmc_api_key']
-                    }
-
-                    session = Session()
-                    session.headers.update(headers)
-
-                    for _ in range(5):
-                        try:
-                            response = session.get(url, params=parameters)
-                            data = json.loads(response.text)
-                            break
-                        except (ConnectionError, Timeout, TooManyRedirects) as e:
-                            logger.info(e)
-                            print("Retrying after 10 seconds...")
-                            await asyncio.sleep(10)
-                    targets = data['data']
-                    sortedTargets = sorted(targets, key=lambda k: k['quote']['USDT']['percent_change_7d'], reverse=False)
+                    sortedTargets = analyzer.get_cmc_info()
                     logger.info(f"{str(len(targets))} target(s)...")
 
                     logger.info("Calculating current opportunities...")

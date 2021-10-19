@@ -656,6 +656,7 @@ async def main(config):
                                     price = str(expBuyPrice - (float(tickSize) * 5))
                                     quantity = str((float(bnb_currency_available) - 1) / float(price))
                                     quantity = quantity[0:quantity.find('.') + lotSize_decimals]
+                                    profit = round((float(quantity) * float(price) * expectedProfitPercentage * (1.0 - float(config['binance_trade_fee'])) - float(bnb_currency_available)), 3)
                                     result_bnb = None
                                     for _ in range(10):
                                         try:
@@ -666,12 +667,12 @@ async def main(config):
                                         except:
                                             logger.info(traceback.format_exc())
                                             continue
-
-                                    # Wait 10 seconds to give exchanges time to process orders
-                                    logger.info('Waiting 20 seconds to give exchanges time to process orders...')
-                                    if config['telegram_notifications_on']:
-                                        telegram_bot_sendtext(config['telegram_bot_token'], config['telegram_user_id'], f"<YATB> [{opp['pair']}]: limit orders sent and waiting for fulfillment...")
-                                    await asyncio.sleep(20)
+                                    if result_bnb:
+                                        # Wait 10 seconds to give exchanges time to process orders
+                                        logger.info('Waiting 20 seconds to give exchanges time to process orders...')
+                                        if config['telegram_notifications_on']:
+                                            telegram_bot_sendtext(config['telegram_bot_token'], config['telegram_user_id'], f"<YATB SIM> [{opp['pair']}] Limit order sent ({opp['interval']} opp). Buying {str(quantity)} @ {str(price)}. Selling @ {str(expSellPrice)}. Exp. Profit ~ {str(profit)} USDT")
+                                        await asyncio.sleep(20)
 
                                     ################################################################################################################################################
                                     # Wait until limit orders have been fulfilled

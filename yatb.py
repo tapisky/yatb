@@ -14,6 +14,7 @@ import requests
 import datetime
 
 from datetime import datetime as datetime_helper
+from datetime import timedelta
 from requests import Request, Session
 from requests.exceptions import ConnectionError, Timeout, TooManyRedirects
 from os.path import exists
@@ -62,7 +63,7 @@ async def main(config):
     if config['sim_mode_on']:
         logger.info(f"Start Simulation balance = {balance}")
     else:
-        logger.info(f"Start Balance = {balance)}")
+        logger.info(f"Start Balance = {balance}")
 
 
     # TAAPI API setup
@@ -143,7 +144,7 @@ async def main(config):
                                 order = bnb_exchange.get_order(symbol=trade['pair'], orderId=trade['orderid'])
                                 break
                             except:
-                                wait asyncio.sleep(5)
+                                await asyncio.sleep(5)
                                 continue
                         if order:
                             if order['status'] == "FILLED":
@@ -573,7 +574,8 @@ async def main(config):
                     if opps:
                         if opps[0]['interval'] in ['2h', '1d']:
                             logger.info("Waiting until 90 seconds before candle close time to re-check indicators")
-                            candle_end = datetime.datetime(time.gmtime()[0], time.gmtime()[1], time.gmtime()[2], time.gmtime()[3] + 1 , 0, 0)
+                            tomorrow = datetime.datetime.today() + timedelta(hours=24)
+                            candle_end = datetime.datetime(tomorrow.year, tomorrow.month, tomorrow.day)
                             now = datetime.datetime(time.gmtime()[0], time.gmtime()[1], time.gmtime()[2], time.gmtime()[3],time.gmtime()[4], time.gmtime()[5])
                             seconds_to_candle_end = (candle_end - now).seconds
                             # Update google sheet status field
@@ -624,6 +626,11 @@ async def main(config):
                                 info = bnb_exchange.get_symbol_info(opp['pair'])
                                 tickSize = info['filters'][0]['tickSize']
                                 pair_num_decimals = tickSize.find('1')
+                                lotSize = info['filters'][2]['stepSize']
+                                if lotSize.find('1') == 0:
+                                    lotSize_decimals = 0
+                                else:
+                                    lotSize_decimals = lotSize.find('1')
                                 expSellPrice = round(float(bnb_buy_price) * expectedProfitPercentage, pair_num_decimals - 1)
                                 expBuyPrice = str(bnb_buy_price)
                                 expBuyPrice = float(expBuyPrice[0:expBuyPrice.find('.') + pair_num_decimals])
@@ -646,8 +653,9 @@ async def main(config):
                                         bnb_currency_available = bnb_balance_result['free']
                                     else:
                                         bnb_currency_available = 0.0
-                                    quantity = str(bnb_currency_available)
                                     price = str(expBuyPrice - (float(tickSize) * 5))
+                                    quantity = str((float(bnb_currency_available) - 1) / float(price))
+                                    quantity = quantity[0:quantity.find('.') + lotSize_decimals]
                                     result_bnb = None
                                     for _ in range(10):
                                         try:
@@ -706,11 +714,11 @@ async def main(config):
                                                 bnb_tickers = bnb_exchange.get_orderbook_tickers()
                                                 bnb_ticker = next(item for item in bnb_tickers if item['symbol'] == opp['pair'])
                                                 bnb_buy_price = bnb_ticker['bidPrice']
-
-                                                quantity = str(bnb_currency_available)
                                                 expBuyPrice = str(bnb_buy_price)
                                                 expBuyPrice = float(expBuyPrice[0:expBuyPrice.find('.') + pair_num_decimals])
                                                 price = str(expBuyPrice - (float(tickSize) * 3))
+                                                quantity = str((float(bnb_currency_available) - 1) / float(price))
+                                                quantity = quantity[0:quantity.find('.') + lotSize_decimals]
                                                 # if usdt_already_spent >= (float(config['trade_amount']) - 60) and not first_try:
                                                 if float(quantity) <= 5.0 and not first_try:
                                                     success = True
@@ -718,7 +726,7 @@ async def main(config):
                                                     result_bnb = None
                                                     result_bnb = bnb_exchange.order_limit_buy(symbol=opp['pair'], quantity=quantity, price=str(price))
                                                     logger.info(result_bnb)
-                                                    trades.append({'exchange': 'bnb', 'orderid': result_bnb['orderId'], 'time': time.time(), 'spread': item['spread']})
+                                                    # trades.append({'exchange': 'bnb', 'orderid': result_bnb['orderId'], 'time': time.time(), 'spread': item['spread']})
                                                     if result_bnb:
                                                         first_try = False
                                                     limit_order_successful = await short_wait_for_bnb_order(opp['pair'], result_bnb['orderId'], config, bnb_exchange, logger)
@@ -740,9 +748,10 @@ async def main(config):
                                                     # calculate trade_amount
                                                     bnb_balance_result = bnb_exchange.get_asset_balance(asset=opp['pair'].replace('USDT',''))
                                                     if bnb_balance_result:
-                                                        quantity = bnb_balance_result['free']
+                                                        bnb_currency_available = bnb_balance_result['free']
                                                     else:
-                                                        quantity = 0.0
+                                                        bnb_currency_available = 0.0
+                                                    quantity = bnb_currency_available[0:bnb_currency_available.find('.') + lotSize_decimals]
                                                     result_bnb = None
                                                     result_bnb = bnb_exchange.order_limit_sell(symbol=opp['pair'], quantity=quantity, price=expSellPrice)
                                                     logger.info(result_bnb)

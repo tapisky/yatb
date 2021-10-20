@@ -151,7 +151,7 @@ async def main(config):
                                 trade['status'] = 'remove'
                                 trade['result'] = 'successful'
                                 # Convert dust to BNB
-                                for _ in range(10):
+                                for _ in range(3):
                                     try:
                                         transfer_dust = bnb_exchange.transfer_dust(asset=trade['pair'].replace('USDT',''))
                                         logger.info(transfer_dust)
@@ -175,9 +175,9 @@ async def main(config):
                                 bnb_currency_available = 0.0
                             bnb_tickers = bnb_exchange.get_orderbook_tickers()
                             bnb_ticker = next(item for item in bnb_tickers if item['symbol'] == 'BNBUSDT')
-                            bnb_sell_price = float(bnb_ticker['sellPrice'])
+                            bnb_sell_price = float(bnb_ticker['askPrice'])
                             bnb_in_usdt = bnb_sell_price * bnb_currency_available
-                            profit = round(usdt_currency_available + bnb_currency_available - float(get_balance(config['sheet_id'])), 2)
+                            profit = round(usdt_currency_available + bnb_in_usdt - float(get_balance(config['sheet_id'])), 2)
                         result_text = "won" if profit > 0 else "lost"
                         logger.info(f"<YATB> [{trade['pair']}] ({trade['result'].upper()}) You have {result_text} {str(round(float(profit), 2))} USDT")
                         if config['telegram_notifications_on']:
@@ -185,7 +185,7 @@ async def main(config):
                         if config['sim_mode_on']:
                             balance = float(balance) + float(actual_volume)
                         else:
-                            balance = usdt_currency_available + bnb_currency_available
+                            balance = usdt_currency_available + bnb_in_usdt
                             # Update google sheet
                         for _ in range(5):
                             try:

@@ -654,10 +654,12 @@ async def main(config):
                                     lotSize_decimals = 0
                                 else:
                                     lotSize_decimals = lotSize.find('1')
-                                expSellPrice = round(float(bnb_buy_price) * expectedProfitPercentage, pair_num_decimals - 1)
+                                expSellPrice = float(bnb_buy_price) * expectedProfitPercentage
+                                expSellPrice = ("%.17f" % expSellPrice).rstrip('0').rstrip('.')
+                                expSellPrice = expSellPrice[0:expSellPrice.find('.') + pair_num_decimals]
                                 expBuyPrice = str(bnb_buy_price)
                                 expBuyPrice = float(expBuyPrice[0:expBuyPrice.find('.') + pair_num_decimals])
-                                stopLoss = float(bnb_buy_price) - ((expSellPrice - float(bnb_buy_price)) * 1.5)
+                                stopLoss = float(bnb_buy_price) - ((float(expSellPrice) - float(bnb_buy_price)) * 1.5)
                                 # fExpSellPrice = ('%.8f' % expSellPrice).rstrip('0').rstrip('.')
                                 if config['sim_mode_on']:
                                     # Simulate buy order

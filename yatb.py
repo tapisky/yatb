@@ -65,6 +65,8 @@ async def main(config):
     else:
         logger.info(f"Start Balance = {balance}")
 
+    # Initialize last dust transfer (we can convert dust in Binance every 6 hours => 21600 seconds)
+    next_dust_transfer = time.time() + 21600
 
     # TAAPI API setup
     # TBD
@@ -150,34 +152,39 @@ async def main(config):
                             if order['status'] == "FILLED":
                                 trade['status'] = 'remove'
                                 trade['result'] = 'successful'
-                                # Convert dust to BNB
-                                for _ in range(3):
-                                    try:
-                                        transfer_dust = bnb_exchange.transfer_dust(asset=trade['pair'].replace('USDT',''))
-                                        logger.info(transfer_dust)
-                                        break
-                                    except:
-                                        await asyncio.sleep(5)
-                                        continue
+                                # Convert dust to BNB every 6 hours
+                                if next_dust_transfer - time.time() < 0:
+                                    for _ in range(3):
+                                        try:
+                                            bnb_account = bnb_exchange.get_account()
+                                            balances = list(filter(lambda item: float(item['free']) > 0.0 and item['asset'] not in ["USDT", "BNB"], bnb_account['balances']))
+                                            dust_assets = ",".join(list(item['asset'] for item in balances))
+                                            transfer_dust = bnb_exchange.transfer_dust(asset=dust_assets)
+                                            logger.info(transfer_dust)
+                                            next_dust_transfer = time.time() + 21600
+                                            break
+                                        except:
+                                            await asyncio.sleep(2)
+                                            continue
                     if trade['status'] == 'remove':
                         if config['sim_mode_on']:
                             profit = float(actual_volume) - float(config['trade_amount'])
                         else:
-                            usdt_balance_result = bnb_exchange.get_asset_balance(asset='USDT')
-                            if usdt_balance_result:
-                                usdt_currency_available = float(usdt_balance_result['free'])
-                            else:
-                                usdt_currency_available = 0.0
-                            bnb_balance_result = bnb_exchange.get_asset_balance(asset='BNB')
-                            if bnb_balance_result:
-                                bnb_currency_available = float(bnb_balance_result['free'])
-                            else:
-                                bnb_currency_available = 0.0
-                            bnb_tickers = bnb_exchange.get_orderbook_tickers()
-                            bnb_ticker = next(item for item in bnb_tickers if item['symbol'] == 'BNBUSDT')
-                            bnb_sell_price = float(bnb_ticker['askPrice'])
-                            bnb_in_usdt = bnb_sell_price * bnb_currency_available
-                            profit = round(usdt_currency_available + bnb_in_usdt - float(get_balance(config['sheet_id'])), 2)
+                            # usdt_balance_result = bnb_exchange.get_asset_balance(asset='USDT')
+                            # if usdt_balance_result:
+                            #     usdt_currency_available = float(usdt_balance_result['free'])
+                            # else:
+                            #     usdt_currency_available = 0.0
+                            # bnb_balance_result = bnb_exchange.get_asset_balance(asset='BNB')
+                            # if bnb_balance_result:
+                            #     bnb_currency_available = float(bnb_balance_result['free'])
+                            # else:
+                            #     bnb_currency_available = 0.0
+                            # bnb_tickers = bnb_exchange.get_orderbook_tickers()
+                            # bnb_ticker = next(item for item in bnb_tickers if item['symbol'] == 'BNBUSDT')
+                            # bnb_sell_price = float(bnb_ticker['askPrice'])
+                            # bnb_in_usdt = bnb_sell_price * bnb_currency_available
+                            profit = round(get_total_usdt_balance() - float(get_balance(config['sheet_id'])), 2)
                         result_text = "won" if profit > 0 else "lost"
                         logger.info(f"<YATB> [{trade['pair']}] ({trade['result'].upper()}) You have {result_text} {str(round(float(profit), 2))} USDT")
                         if config['telegram_notifications_on']:
@@ -2202,18 +2209,23 @@ def get_kraken_balances(exchange, config):
         krk_target_currency_available = krk_balance['result'][config['krk_target_currency']]
     return ({'krk_base_currency_available': krk_base_currency_available, 'krk_target_currency_available': krk_target_currency_available})
 
-def get_usdt_balance(exchange):
-    for _ in range(5):
+def get_total_usdt_balance(exchange):
+    total_usdt_balance = 0.0
+    for _ in range(10):
         try:
-            bnb_balance_result = exchange.get_asset_balance(asset='USDT')
+            bnb_account = exchange.get_account()
+            balances = list(filter(lambda item: float(item['free']) > 0.0 and item['asset'] != "USDT", bnb_account['balances']))
+            bnb_tickers = bnb_exchange.get_orderbook_tickers()
+            for item in balances:
+                bnb_ticker = next(pair for pair in bnb_tickers if pair['symbol'] == item['asset'] + "USDT")
+                total_usdt_balance += float(bnb_ticker['askPrice']) * float(item['free'])
+            usdt_balance = list(filter(lambda item: item['asset'] == "USDT", bnb_account['balances']))
+            total_usdt_balance += float(usdt_balance[0]['free'])
             break
         except:
             time.sleep(5)
             continue
-    if bnb_balance_result:
-        return float(bnb_balance_result['free'])
-    else:
-        return 0.0
+    return round(total_usdt_balance, 2)
 
 def get_binance_balances(exchange, config):
     bnb_balance_result = exchange.get_asset_balance(asset=config['bnb_base_currency'])

@@ -604,8 +604,11 @@ async def main(config):
                     if opps:
                         if opps[0]['interval'] in ['2h', '1d']:
                             logger.info("Waiting until 90 seconds before candle close time to re-check indicators")
-                            tomorrow = datetime.datetime.today() + timedelta(hours=24)
-                            candle_end = datetime.datetime(tomorrow.year, tomorrow.month, tomorrow.day)
+                            if time.gmtime()[3] < 23:
+                                candle_end = datetime.datetime(time.gmtime()[0], time.gmtime()[1], time.gmtime()[2], time.gmtime()[3] + 1)
+                            else:
+                                tomorrow = datetime.datetime(time.gmtime()[0], time.gmtime()[1], time.gmtime()[2]) + timedelta(hours=24)
+                                candle_end = datetime.datetime(tomorrow.year, tomorrow.month, tomorrow.day)
                             now = datetime.datetime(time.gmtime()[0], time.gmtime()[1], time.gmtime()[2], time.gmtime()[3],time.gmtime()[4], time.gmtime()[5])
                             seconds_to_candle_end = (candle_end - now).seconds
                             # Update google sheet status field
@@ -828,6 +831,8 @@ async def main(config):
                                     else:
                                         logger.info(f"{opp['pair']} Could not market buy. Trying next opp...")
                                         continue
+                        # Print opps in google sheet for reference
+                        update_google_sheet_opps(config['sheet_id'], str(opps))
                 else: #if sim_trades > 0 and time.localtime()[3] % 4 == 3 and time.localtime()[4] > 30:
                     logger.info("Waiting for the right time...")
             else: # if exchange_is_up:
@@ -2630,6 +2635,40 @@ def update_google_sheet_status(sheet_id, status_message):
         "majorDimension": "ROWS",
         "values": [
             [status_message],
+        ],
+    }
+
+    # append new balance and date
+    result = sheet.values().update(spreadsheetId=sheet_id,
+                                   range=data_range,
+                                   valueInputOption=value_input_option,
+                                   body=value_range_body).execute()
+
+def update_google_sheet_opps(sheet_id, opps):
+    creds = None
+    # The file token.pickle stores the user's access and refresh tokens, and is
+    # created automatically when the authorization flow completes for the first
+    # time.
+    if os.path.exists('token.pickle'):
+        with open('token.pickle', 'rb') as token:
+            creds = pickle.load(token)
+
+            service = build('sheets', 'v4', credentials=creds)
+
+            # Call the Sheets API
+            sheet = service.spreadsheets()
+
+    # Update google sheet with status
+    # How the input data should be interpreted.
+    value_input_option = 'USER_ENTERED'
+
+    data_range = "SimulationTest!G2:G2"
+
+    value_range_body = {
+        "range": data_range,
+        "majorDimension": "ROWS",
+        "values": [
+            [opps],
         ],
     }
 

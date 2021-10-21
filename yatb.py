@@ -73,6 +73,9 @@ async def main(config):
     trades = []
     ongoingTradePairs = []
 
+    #  Initialize opps field in googlesheet
+    update_google_sheet_opps(config['sheet_id'], "")
+
     if config['telegram_notifications_on']:
         if config['sim_mode_on']:
             telegram_bot_sendtext(config['telegram_bot_token'], config['telegram_user_id'], f"<YATB SIM> Starting simulation...")
@@ -107,6 +110,24 @@ async def main(config):
                 exchange_is_up = exchange_up(bnb_exchange)
 
             if exchange_is_up:
+                if not config['sim_mode_on']:
+                    # Convert dust to BNB every 6 hours
+                    if next_dust_transfer - time.time() < 0:
+                        for _ in range(3):
+                            try:
+                                bnb_account = bnb_exchange.get_account()
+                                balances = list(filter(lambda item: float(item['free']) > 0.0 and item['asset'] not in ["USDT", "BNB"], bnb_account['balances']))
+                                if balances:
+                                    dust_assets = ",".join(list(item['asset'] for item in balances))
+                                    transfer_dust = bnb_exchange.transfer_dust(asset=dust_assets)
+                                    logger.info(transfer_dust)
+                                    next_dust_transfer = time.time() + 21600
+                                    if config['telegram_notifications_on']:
+                                        telegram_bot_sendtext(config['telegram_bot_token'], config['telegram_user_id'], f"<YATB> Assets dust converted to BNB")
+                                break
+                            except:
+                                await asyncio.sleep(2)
+                                continue
 
                 # Manage active trades
                 for trade in trades:
@@ -152,39 +173,11 @@ async def main(config):
                             if order['status'] == "FILLED":
                                 trade['status'] = 'remove'
                                 trade['result'] = 'successful'
-                                # Convert dust to BNB every 6 hours
-                                if next_dust_transfer - time.time() < 0:
-                                    for _ in range(3):
-                                        try:
-                                            bnb_account = bnb_exchange.get_account()
-                                            balances = list(filter(lambda item: float(item['free']) > 0.0 and item['asset'] not in ["USDT", "BNB"], bnb_account['balances']))
-                                            dust_assets = ",".join(list(item['asset'] for item in balances))
-                                            transfer_dust = bnb_exchange.transfer_dust(asset=dust_assets)
-                                            logger.info(transfer_dust)
-                                            next_dust_transfer = time.time() + 21600
-                                            break
-                                        except:
-                                            await asyncio.sleep(2)
-                                            continue
                     if trade['status'] == 'remove':
                         if config['sim_mode_on']:
                             profit = float(actual_volume) - float(config['trade_amount'])
                         else:
-                            # usdt_balance_result = bnb_exchange.get_asset_balance(asset='USDT')
-                            # if usdt_balance_result:
-                            #     usdt_currency_available = float(usdt_balance_result['free'])
-                            # else:
-                            #     usdt_currency_available = 0.0
-                            # bnb_balance_result = bnb_exchange.get_asset_balance(asset='BNB')
-                            # if bnb_balance_result:
-                            #     bnb_currency_available = float(bnb_balance_result['free'])
-                            # else:
-                            #     bnb_currency_available = 0.0
-                            # bnb_tickers = bnb_exchange.get_orderbook_tickers()
-                            # bnb_ticker = next(item for item in bnb_tickers if item['symbol'] == 'BNBUSDT')
-                            # bnb_sell_price = float(bnb_ticker['askPrice'])
-                            # bnb_in_usdt = bnb_sell_price * bnb_currency_available
-                            profit = round(get_total_usdt_balance() - float(get_balance(config['sheet_id'])), 2)
+                            profit = round(get_total_usdt_balance(bnb_exchange) - float(get_balance(config['sheet_id'])), 2)
                         result_text = "won" if profit > 0 else "lost"
                         logger.info(f"<YATB> [{trade['pair']}] ({trade['result'].upper()}) You have {result_text} {str(round(float(profit), 2))} USDT")
                         if config['telegram_notifications_on']:

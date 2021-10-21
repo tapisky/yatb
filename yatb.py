@@ -100,6 +100,7 @@ async def main(config):
                     update_google_sheet_status(config['sheet_id'], statusMessage)
                     break
                 except:
+                    logger.info(traceback.format_exc())
                     await asyncio.sleep(3)
                     continue
 
@@ -126,6 +127,7 @@ async def main(config):
                                         telegram_bot_sendtext(config['telegram_bot_token'], config['telegram_user_id'], f"<YATB> Assets dust converted to BNB")
                                 break
                             except:
+                                logger.info(traceback.format_exc())
                                 await asyncio.sleep(2)
                                 continue
 
@@ -167,6 +169,7 @@ async def main(config):
                                 order = bnb_exchange.get_order(symbol=trade['pair'], orderId=trade['orderid'])
                                 break
                             except:
+                                logger.info(traceback.format_exc())
                                 await asyncio.sleep(5)
                                 continue
                         if order:
@@ -192,6 +195,7 @@ async def main(config):
                                 update_google_sheet(config['sheet_id'], config['range_name'], round(balance, 2), 0)
                                 break
                             except:
+                                logger.info(traceback.format_exc())
                                 await asyncio.sleep(5)
                                 continue
                     else:
@@ -225,6 +229,7 @@ async def main(config):
                             update_google_sheet_status(config['sheet_id'], statusMessage)
                             break
                         except:
+                            logger.info(traceback.format_exc())
                             await asyncio.sleep(1)
                             continue
 
@@ -612,6 +617,7 @@ async def main(config):
                                     update_google_sheet_status(config['sheet_id'], statusMessage)
                                     break
                                 except:
+                                    logger.info(traceback.format_exc())
                                     await asyncio.sleep(1)
                                     continue
                             if seconds_to_candle_end > 90:
@@ -849,6 +855,7 @@ async def main(config):
                         update_google_sheet_status(config['sheet_id'], statusMessage)
                         break
                     except:
+                        logger.info(traceback.format_exc())
                         await asyncio.sleep(1)
                         continue
                 # Wait given seconds until next poll
@@ -2164,37 +2171,7 @@ def get_config():
     config_file = open(config_path)
     data = yaml.load(config_file, Loader=yaml.FullLoader)
     config_file.close()
-    check_config(data)
     return data
-
-def check_config(data):
-    # Check Crypto.com trading pair and coins
-    try:
-        eval('cro.pairs.' + data['cdc_trading_pair'])
-    except AttributeError:
-        print("Crypto.com's trading pair '{}' does not exist (check your config_file)".format(data['cdc_trading_pair']))
-        sys.exit(1)
-    try:
-        eval('cro.coins.' + data['cdc_target_currency'])
-    except AttributeError:
-        print('Currency "{}" does not exist (check your config_file)'.format(data['cdc_target_currency']))
-        sys.exit(1)
-    try:
-        eval('cro.coins.' + data['cdc_base_currency'])
-    except AttributeError:
-        print('Currency "{}" does not exist (check your config_file)'.format(data['cdc_base_currency']))
-        sys.exit(1)
-
-    # Check kraken trading pair and coins
-    try:
-        krk_x = krakenex.API(key='', secret='')
-        result = krk_x.query_public("Ticker", {'pair': data['krk_trading_pair']})
-        if result['error'] != [] and result['error'][0] == 'EQuery:Unknown asset pair':
-            raise AttributeError
-    except AttributeError:
-        print("Kraken's Trading pair '{}' does not exist (check your config_file)".format(data['krk_trading_pair']))
-        sys.exit(1)
-    print('All options looking good\n')
 
 def get_kraken_balances(exchange, config):
     krk_balance = exchange.query_private('Balance')
@@ -2221,6 +2198,7 @@ def get_total_usdt_balance(exchange):
             total_usdt_balance += float(usdt_balance[0]['free'])
             break
         except:
+            print(traceback.format_exc())
             time.sleep(5)
             continue
     return round(total_usdt_balance, 2)
@@ -2246,6 +2224,7 @@ def exchange_up(bnb):
             bnb_up = bnb_up_result and bnb_up_result['status'] == 0 # binance api docs -> 0=normal; 1=system maintenance
             break
         except:
+            print(traceback.format_exc())
             time.sleep(5)
             continue
     return bnb_up

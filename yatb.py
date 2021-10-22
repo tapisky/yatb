@@ -196,7 +196,7 @@ async def main(config):
                                 logger.info(traceback.format_exc())
                                 await asyncio.sleep(5)
                                 continue
-                        opp_details += f"{trade['pair']} - {trade['interval']}"
+                        opp_details = f"{trade['pair']} - {trade['interval']}"
                         for _ in range(5):
                             try:
                                 update_google_sheet_opp_details(config['sheet_id'], opp_details)

@@ -198,6 +198,15 @@ async def main(config):
                                 logger.info(traceback.format_exc())
                                 await asyncio.sleep(5)
                                 continue
+                        opp_details += f"{trade['pair']} - {trade['interval']})"
+                        for _ in range(5):
+                            try:
+                                update_google_sheet_opp_details(config['sheet_id'], opp_details)
+                                break
+                            except:
+                                logger.info(traceback.format_exc())
+                                await asyncio.sleep(3)
+                                continue
                     else:
                         # Current trade is still valid
                         logger.info(f"<YATB> [{trade['pair']}] Trade ongoing:")
@@ -2190,7 +2199,7 @@ def get_total_usdt_balance(exchange):
         try:
             bnb_account = exchange.get_account()
             balances = list(filter(lambda item: float(item['free']) > 0.0 and item['asset'] != "USDT", bnb_account['balances']))
-            bnb_tickers = bnb_exchange.get_orderbook_tickers()
+            bnb_tickers = exchange.get_orderbook_tickers()
             for item in balances:
                 bnb_ticker = next(pair for pair in bnb_tickers if pair['symbol'] == item['asset'] + "USDT")
                 total_usdt_balance += float(bnb_ticker['askPrice']) * float(item['free'])
@@ -2648,6 +2657,44 @@ def update_google_sheet_opps(sheet_id, opps):
     result = sheet.values().update(spreadsheetId=sheet_id,
                                    range=data_range,
                                    valueInputOption=value_input_option,
+                                   body=value_range_body).execute()
+
+def update_google_sheet_opp_details(sheet_id, opp_details):
+    creds = None
+    # The file token.pickle stores the user's access and refresh tokens, and is
+    # created automatically when the authorization flow completes for the first
+    # time.
+    if os.path.exists('token.pickle'):
+        with open('token.pickle', 'rb') as token:
+            creds = pickle.load(token)
+
+            service = build('sheets', 'v4', credentials=creds)
+
+            # Call the Sheets API
+            sheet = service.spreadsheets()
+
+    # Update google sheet with status
+    # How the input data should be interpreted.
+    value_input_option = 'USER_ENTERED'
+
+    # How the input data should be inserted.
+    insert_data_option = 'OVERWRITE'
+
+    data_range = "SimulationTest!H3:H1000"
+
+    value_range_body = {
+        "range": data_range,
+        "majorDimension": "ROWS",
+        "values": [
+            [opp_details],
+        ],
+    }
+
+    # append new balance and date
+    result = sheet.values().append(spreadsheetId=sheet_id,
+                                   range=data_range,
+                                   valueInputOption=value_input_option,
+                                   insertDataOption=insert_data_option,
                                    body=value_range_body).execute()
 
 def get_balance(sheet_id):

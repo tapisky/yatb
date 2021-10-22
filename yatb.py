@@ -178,17 +178,15 @@ async def main(config):
                                 trade['result'] = 'successful'
                     if trade['status'] == 'remove':
                         if config['sim_mode_on']:
+                            balance = float(balance) + float(actual_volume)
                             profit = float(actual_volume) - float(config['trade_amount'])
                         else:
-                            profit = round(get_total_usdt_balance(bnb_exchange) - float(get_balance(config['sheet_id'])), 2)
+                            balance = get_total_usdt_balance(bnb_exchange)
+                            profit = round(float(balance) - float(get_balance(config['sheet_id'])), 2)
                         result_text = "won" if profit > 0 else "lost"
                         logger.info(f"<YATB> [{trade['pair']}] ({trade['result'].upper()}) You have {result_text} {str(round(float(profit), 2))} USDT")
                         if config['telegram_notifications_on']:
                             telegram_bot_sendtext(config['telegram_bot_token'], config['telegram_user_id'], f"<YATB> [{trade['pair']}] ({trade['result'].upper()}) You have {result_text} {str(round(float(profit), 2))} USDT")
-                        if config['sim_mode_on']:
-                            balance = float(balance) + float(actual_volume)
-                        else:
-                            balance = usdt_currency_available + bnb_in_usdt
                             # Update google sheet
                         for _ in range(5):
                             try:
@@ -198,7 +196,7 @@ async def main(config):
                                 logger.info(traceback.format_exc())
                                 await asyncio.sleep(5)
                                 continue
-                        opp_details += f"{trade['pair']} - {trade['interval']})"
+                        opp_details += f"{trade['pair']} - {trade['interval']}"
                         for _ in range(5):
                             try:
                                 update_google_sheet_opp_details(config['sheet_id'], opp_details)

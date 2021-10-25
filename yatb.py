@@ -538,6 +538,7 @@ async def main(config):
                                 if time.gmtime()[3] % 4 == 3 and time.gmtime()[4] >= 53:
                                     logger.info(f"4H Data: {pair} | Prev Kline {str(prev4HKline)} | This Kline {str(this4HKline)} | Prev Kline Low {str(prev4HKlineLow)} | Prev Lower Bolinger {str(prev4HBolingerLowBand)} | Prev RSI {str(round(prev4HRsi, 2))} | This RSI {str(round(this4HRsi, 2))} | Prev StochF K,D {str(round(prev4HStochFFastK, 2))}|{str(round(prev4HStochFFastD, 2))} | This StochF K,D {str(round(this4HStochFFastK, 2))}|{str(round(this4HStochFFastD, 2))}")
                                 logger.info(f"2H Data: {pair} | This RSI {str(round(this2HRsi, 2))} | Prev StochF D {str(round(prev2HStochFFastD, 2))} | This StochF K,D {str(round(this2HStochFFastK, 2))}|{str(round(this2HStochFFastD, 2))} | This Lower Bolinger {str(round(this2HBolinger, 4))}")
+                                now = datetime.datetime(time.gmtime()[0], time.gmtime()[1], time.gmtime()[2], time.gmtime()[3])
 
                                 if (
                                     time.gmtime()[3] % 24 == 23
@@ -592,6 +593,7 @@ async def main(config):
                                         and this2HStochFFastD > prev2HStochFFastD - 15.0
                                         and this2HStochFFastD > 28.0
                                         and prev2HStochFFastD > 28.0)
+                                    and not twoh_trading_break(now)
                                     and sim_trades > 0
                                 ):
                                     # Put 2H opportunities in opps dict
@@ -2830,6 +2832,9 @@ def get_2h_tech_info(pair):
             time.sleep(2)
             continue
     return this2HRsi, this2HStochFFastK, this2HStochFFastD, prev2HStochFFastD, this2HBolinger
+
+def twoh_trading_break(a_date):
+    return a_date.weekday() == 6 and a_date.hour > 1 and a_date.hour < 23
 
 loop = asyncio.get_event_loop()
 try:

@@ -222,9 +222,11 @@ async def main(config):
                 excludedPairs = [item['pair'] for item in ongoingTradePairs]
 
                 # Check if there are available trades and if the time to check markets is correct
+                # Check every 2 hours except just a few minutes before GM 22:00 so that we make room for 1D candle opps
                 if (
                     sim_trades > 0
                     and time.gmtime()[3] % 2 == 1
+                    and time.gmtime()[3] != 21
                     and time.gmtime()[4] >= 53
                     and time.gmtime()[4] < 58
                 ):
@@ -279,6 +281,9 @@ async def main(config):
                         pair = item['symbol'] + "USDT"
                         if pair in usdt_tickers and pair not in excludedPairs:
                             # Initialize variables
+                            kline1DayRatio = None
+                            kline4HoursRatio = None
+                            kline2HoursRatio = None
                             prev4HKlineClose = None
                             prev4HKlineLow = None
                             this4HKlineClose = None
@@ -299,6 +304,9 @@ async def main(config):
                             this2HStochFFastK = None
                             this2HStochFFastD = None
                             prev2HStochFFastD = None
+                            del kline1DayRatio
+                            del kline4HoursRatio
+                            del kline2HoursRatio
                             del prev4HKlineClose
                             del prev4HKlineLow
                             del this4HKlineClose
@@ -322,6 +330,19 @@ async def main(config):
 
                             # Get 1 day tech info if the 1d candle is about to finish
                             if time.gmtime()[3] % 24 == 23 and time.gmtime()[4] >= 53:
+                                for _ in range(5):
+                                    try:
+                                        this1DKlineClose = None
+                                        this1DKlineLow = None
+                                        klines1Day = bnb_exchange.get_historical_klines(pair, bnb_exchange.KLINE_INTERVAL_1DAY, "1 day ago UTC")
+                                        this1DKlineClose = float(klines1Day[0][4])
+                                        this1DKlineLow = float(klines1Day[0][3])
+                                        kline1DayRatio = this1DKlineClose/this1DKlineLow
+                                        break
+                                    except:
+                                        logger.info(f"Retrying... ({pair})")
+                                        await asyncio.sleep(2)
+                                        continue
                                 taapiSymbol = pair.split('USDT')[0] + "/" + "USDT"
                                 endpoint = "https://api.taapi.io/bulk"
 
@@ -387,6 +408,7 @@ async def main(config):
                                         prev4HKlineLow = float(klines4Hours[1][3])
                                         this4HKlineClose = float(klines4Hours[2][4])
                                         this4HKlineLow = float(klines4Hours[2][3])
+                                        kline4HoursRatio = this4HKlineClose/this4HKlineLow
                                         break
                                     except:
                                         logger.info(f"Retrying... ({pair})")
@@ -473,6 +495,19 @@ async def main(config):
 
                             # Get 2H indicators when the 2 hours candle is about to finish
                             # Define a JSON body with parameters to be sent to the API
+                            for _ in range(5):
+                                try:
+                                    this2HKlineClose = None
+                                    this2HKlineLow = None
+                                    klines2Hours = bnb_exchange.get_historical_klines(pair, bnb_exchange.KLINE_INTERVAL_2HOUR, "2 hours ago UTC")
+                                    this2HKlineClose = float(klines2Hours[0][4])
+                                    this2HKlineLow = float(klines2Hours[0][3])
+                                    kline2HoursRatio = this2HKlineClose/this2HKlineLow
+                                    break
+                                except:
+                                    logger.info(f"Retrying... ({pair})")
+                                    await asyncio.sleep(2)
+                                    continue
                             taapiSymbol = pair.split('USDT')[0] + "/" + "USDT"
                             endpoint = "https://api.taapi.io/bulk"
 
@@ -534,10 +569,10 @@ async def main(config):
 
                             try:
                                 if time.gmtime()[3] % 24 == 23 and time.gmtime()[4] >= 53:
-                                    logger.info(f"1D Data: {pair} | This RSI {str(round(this1DRsi, 2))} | This StochF K,D {str(round(this1DStochFFastK, 2))}|{str(round(this1DStochFFastD, 2))}")
+                                    logger.info(f"1D Data: {pair} | kline1DayRatio {str(round(kline1DayRatio, 4))} | This RSI {str(round(this1DRsi, 2))} | This StochF K,D {str(round(this1DStochFFastK, 2))}|{str(round(this1DStochFFastD, 2))}")
                                 if time.gmtime()[3] % 4 == 3 and time.gmtime()[4] >= 53:
-                                    logger.info(f"4H Data: {pair} | Prev Kline {str(prev4HKline)} | This Kline {str(this4HKline)} | Prev Kline Low {str(prev4HKlineLow)} | Prev Lower Bolinger {str(prev4HBolingerLowBand)} | Prev RSI {str(round(prev4HRsi, 2))} | This RSI {str(round(this4HRsi, 2))} | Prev StochF K,D {str(round(prev4HStochFFastK, 2))}|{str(round(prev4HStochFFastD, 2))} | This StochF K,D {str(round(this4HStochFFastK, 2))}|{str(round(this4HStochFFastD, 2))}")
-                                logger.info(f"2H Data: {pair} | This RSI {str(round(this2HRsi, 2))} | Prev StochF D {str(round(prev2HStochFFastD, 2))} | This StochF K,D {str(round(this2HStochFFastK, 2))}|{str(round(this2HStochFFastD, 2))} | This Lower Bolinger {str(round(this2HBolinger, 4))}")
+                                    logger.info(f"4H Data: {pair} | kline4HoursRatio {str(round(kline4HoursRatio, 4))} | Prev Kline {str(prev4HKline)} | This Kline {str(this4HKline)} | Prev Kline Low {str(prev4HKlineLow)} | Prev Lower Bolinger {str(prev4HBolingerLowBand)} | Prev RSI {str(round(prev4HRsi, 2))} | This RSI {str(round(this4HRsi, 2))} | Prev StochF K,D {str(round(prev4HStochFFastK, 2))}|{str(round(prev4HStochFFastD, 2))} | This StochF K,D {str(round(this4HStochFFastK, 2))}|{str(round(this4HStochFFastD, 2))}")
+                                logger.info(f"2H Data: {pair} | kline2HoursRatio {str(round(kline2HoursRatio, 4))} | This RSI {str(round(this2HRsi, 2))} | Prev StochF D {str(round(prev2HStochFFastD, 2))} | This StochF K,D {str(round(this2HStochFFastK, 2))}|{str(round(this2HStochFFastD, 2))} | This Lower Bolinger {str(round(this2HBolinger, 4))}")
                                 now = datetime.datetime(time.gmtime()[0], time.gmtime()[1], time.gmtime()[2], time.gmtime()[3])
 
                                 if (
@@ -547,6 +582,7 @@ async def main(config):
                                     and this1DStochFFastK < 14.5
                                     and this1DStochFFastK < this2HStochFFastD
                                     and this1DStochFFastK + 10.0 < this2HStochFFastD
+                                    and kline1DayRatio > 1.006
                                     and sim_trades > 0
                                 ):
                                     # Put 1D opportunities in opps dict
@@ -557,7 +593,8 @@ async def main(config):
                                     and time.gmtime()[4] >= 53
                                     and this4HKline == 'negative'
                                     and float(this4HKlineClose) < float(this4HBolingerLowBand)
-                                    and this4HRsi < 35.0
+                                    and this4HRsi < 30.0
+                                    and kline4HoursRatio > 1.0029
                                     and sim_trades > 0)
                                     or (time.gmtime()[3] % 4 == 3
                                         and time.gmtime()[4] >= 53
@@ -565,6 +602,7 @@ async def main(config):
                                         and this4HKline == 'positive'
                                         and float(this4HKlineLow) < float(this4HBolingerLowBand)
                                         and float(this4HKlineClose) < float(this4HBolingerMidBand)
+                                        and kline4HoursRatio > 1.0029
                                         and sim_trades > 0
                                     )
                                     or (
@@ -576,6 +614,7 @@ async def main(config):
                                         and this4HStochFFastK < 99.0
                                         and this4HStochFFastK - this4HStochFFastD > (this4HStochFFastK * 0.275)
                                         and this4HRsi < 61.0
+                                        and kline4HoursRatio > 1.0029
                                         and sim_trades > 0)
                                     )
                                 ):
@@ -594,6 +633,7 @@ async def main(config):
                                         and this2HStochFFastD > 28.0
                                         and prev2HStochFFastD > 28.0)
                                     and not twoh_trading_break(now)
+                                    and kline2HoursRatio > 1.002
                                     and sim_trades > 0
                                 ):
                                     # Put 2H opportunities in opps dict

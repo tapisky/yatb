@@ -298,6 +298,7 @@ async def main(config):
                             this4HStochFFastK = None
                             this4HStochFFastD = None
                             this1DRsi = None
+                            prev1DStochFFastK = None
                             this1DStochFFastK = None
                             this1DStochFFastD = None
                             this2HRsi = None
@@ -321,6 +322,7 @@ async def main(config):
                             del this4HStochFFastK
                             del this4HStochFFastD
                             del this1DRsi
+                            del prev1DStochFFastK
                             del this1DStochFFastK
                             del this1DStochFFastD
                             del this2HRsi
@@ -364,6 +366,14 @@ async def main(config):
                                             "indicator": "stochf",
                                             "optInFastK_Period": 3,
                                             "optInFastD_Period": 3
+                                        },
+                                        {
+                                            # Previous stoch fast
+                                            "id": "prevstochf",
+                                            "indicator": "stochf",
+                                            "backtrack": 1,
+                                            "optInFastK_Period": 3,
+                                            "optInFastD_Period": 3
                                         }
                                         ]
                                     }
@@ -380,6 +390,7 @@ async def main(config):
                                         this1DRsi = float(result['data'][0]['result']['value'])
                                         this1DStochFFastK = float(result['data'][1]['result']['valueFastK'])
                                         this1DStochFFastD = float(result['data'][1]['result']['valueFastD'])
+                                        prev1DStochFFastK = float(result['data'][2]['result']['valueFastK'])
                                         await asyncio.sleep(2)
                                         break
                                     except:
@@ -569,7 +580,7 @@ async def main(config):
 
                             try:
                                 if time.gmtime()[3] % 24 == 23 and time.gmtime()[4] >= 53:
-                                    logger.info(f"1D Data: {pair} | kline1DayRatio {str(round(kline1DayRatio, 4))} | This RSI {str(round(this1DRsi, 2))} | This StochF K,D {str(round(this1DStochFFastK, 2))}|{str(round(this1DStochFFastD, 2))}")
+                                    logger.info(f"1D Data: {pair} | kline1DayRatio {str(round(kline1DayRatio, 4))} | This RSI {str(round(this1DRsi, 2))} | Prev StochF K {str(round(prev1DStochFFastK, 2))} | This StochF K,D {str(round(this1DStochFFastK, 2))}|{str(round(this1DStochFFastD, 2))}")
                                 if time.gmtime()[3] % 4 == 3 and time.gmtime()[4] >= 53:
                                     logger.info(f"4H Data: {pair} | kline4HoursRatio {str(round(kline4HoursRatio, 4))} | Prev Kline {str(prev4HKline)} | This Kline {str(this4HKline)} | Prev Kline Low {str(prev4HKlineLow)} | Prev Lower Bolinger {str(prev4HBolingerLowBand)} | Prev RSI {str(round(prev4HRsi, 2))} | This RSI {str(round(this4HRsi, 2))} | Prev StochF K,D {str(round(prev4HStochFFastK, 2))}|{str(round(prev4HStochFFastD, 2))} | This StochF K,D {str(round(this4HStochFFastK, 2))}|{str(round(this4HStochFFastD, 2))}")
                                 logger.info(f"2H Data: {pair} | kline2HoursRatio {str(round(kline2HoursRatio, 4))} | This RSI {str(round(this2HRsi, 2))} | Prev StochF D {str(round(prev2HStochFFastD, 2))} | This StochF K,D {str(round(this2HStochFFastK, 2))}|{str(round(this2HStochFFastD, 2))} | This Lower Bolinger {str(round(this2HBolinger, 4))}")
@@ -582,6 +593,7 @@ async def main(config):
                                     and this1DStochFFastK < 14.5
                                     and this1DStochFFastK < this2HStochFFastD
                                     and this1DStochFFastK + 10.0 < this2HStochFFastD
+                                    and prev1DStochFFastK < 78.0
                                     and kline1DayRatio > 1.006
                                     and sim_trades > 0
                                 ):

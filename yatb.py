@@ -90,7 +90,7 @@ async def main(config):
             logger.info(trades)
 
             # Update google sheet status field
-            dateStamp = datetime_helper.now().strftime("%d/%m/%Y %H:%M:%S")
+            dateStamp = datetime_helper.utcnow().strftime("%d/%m/%Y %H:%M:%S")
             statusMessage = f"{dateStamp} -- Iteration {iteration}"
             if trades:
                 ongoing_trades = list(trade['pair'] + " " + trade['interval'] for trade in trades)
@@ -231,7 +231,7 @@ async def main(config):
                     and time.gmtime()[4] < 58
                 ):
                     # Update google sheet status field
-                    dateStamp = datetime_helper.now().strftime("%d/%m/%Y %H:%M:%S")
+                    dateStamp = datetime_helper.utcnow().strftime("%d/%m/%Y %H:%M:%S")
                     statusMessage = f"{dateStamp} -- Iteration {iteration}: Looking for opportunities"
                     for _ in range(3):
                         try:
@@ -669,7 +669,7 @@ async def main(config):
                             now = datetime.datetime(time.gmtime()[0], time.gmtime()[1], time.gmtime()[2], time.gmtime()[3],time.gmtime()[4], time.gmtime()[5])
                             seconds_to_candle_end = (candle_end - now).seconds
                             # Update google sheet status field
-                            dateStamp = datetime_helper.now().strftime("%d/%m/%Y %H:%M:%S")
+                            dateStamp = datetime_helper.utcnow().strftime("%d/%m/%Y %H:%M:%S")
                             statusMessage = f"{dateStamp} -- Iteration {iteration}: Waiting until 90 seconds before candle close"
                             for _ in range(3):
                                 try:
@@ -725,6 +725,12 @@ async def main(config):
                                 expSellPrice = float(bnb_buy_price) * expectedProfitPercentage
                                 expSellPrice = ("%.17f" % expSellPrice).rstrip('0').rstrip('.')
                                 expSellPrice = expSellPrice[0:expSellPrice.find('.') + pair_num_decimals]
+                                stopPrice = float(bnb_buy_price) * 0.996
+                                stopPrice = ("%.17f" % stopPrice).rstrip('0').rstrip('.')
+                                stopPrice = stopPrice[0:stopPrice.find('.') + pair_num_decimals]
+                                stopLimitPrice = float(bnb_buy_price) * 0.995
+                                stopLimitPrice = ("%.17f" % stopLimitPrice).rstrip('0').rstrip('.')
+                                stopLimitPrice = stopLimitPrice[0:stopLimitPrice.find('.') + pair_num_decimals]
                                 expBuyPrice = str(bnb_buy_price)
                                 expBuyPrice = float(expBuyPrice[0:expBuyPrice.find('.') + pair_num_decimals])
                                 stopLoss = float(bnb_buy_price) - ((float(expSellPrice) - float(bnb_buy_price)) * 1.5)
@@ -869,7 +875,14 @@ async def main(config):
                                                 quantity = bnb_currency_available[0:bnb_currency_available.find('.') + lotSize_decimals]
                                                 logger.info(f"Attempting limit order {opp['pair']}: quantity = {str(quantity)}; price = {str(expSellPrice)}")
                                                 result_bnb = None
-                                                result_bnb = bnb_exchange.order_limit_sell(symbol=opp['pair'], quantity=quantity, price=expSellPrice)
+                                                # result_bnb = bnb_exchange.order_limit_sell(symbol=opp['pair'], quantity=quantity, price=expSellPrice)
+                                                result_bnb = bnb_exchange.order_oco_sell(
+                                                    symbol=opp['pair'],
+                                                    quantity=quantity,
+                                                    price=expSellPrice,
+                                                    stopPrice=stopPrice,
+                                                    stopLimitPrice=stopLimitPrice,
+                                                    stopLimitTimeInForce="GTC")
                                                 logger.info(result_bnb)
                                                 trades.append({'pair': opp['pair'], 'type': 'real', 'interval': opp['interval'], 'status': 'active', 'orderid': result_bnb['orderId'], 'time': time.time(), 'expirytime': time.time() + 43200.0, 'buyprice': float(bnb_buy_price), 'expsellprice': expSellPrice, 'stoploss': stopLoss, 'quantity': quantity})
                                                 sim_trades -= 1
@@ -904,7 +917,7 @@ async def main(config):
                 break
             else:
                 # Update google sheet status field
-                dateStamp = datetime_helper.now().strftime("%d/%m/%Y %H:%M:%S")
+                dateStamp = datetime_helper.utcnow().strftime("%d/%m/%Y %H:%M:%S")
                 statusMessage = f"{dateStamp} -- Iteration {iteration}: Waiting for next iteration"
                 if trades:
                     ongoing_trades = list(trade['pair'] + " " + trade['interval'] for trade in trades)
@@ -2896,7 +2909,7 @@ except KeyboardInterrupt:
 finally:
     print("Stopping YATB...")
     # Update google sheet status field
-    dateStamp = datetime_helper.now().strftime("%d/%m/%Y %H:%M:%S")
+    dateStamp = datetime_helper.utcnow().strftime("%d/%m/%Y %H:%M:%S")
     statusMessage = f"{dateStamp} -- Bot stopped"
     for _ in range(5):
         try:

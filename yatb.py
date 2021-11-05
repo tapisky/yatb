@@ -728,10 +728,10 @@ async def main(config):
                                 expSellPrice = float(bnb_buy_price) * expectedProfitPercentage
                                 expSellPrice = ("%.17f" % expSellPrice).rstrip('0').rstrip('.')
                                 expSellPrice = expSellPrice[0:expSellPrice.find('.') + pair_num_decimals]
-                                stopPrice = float(bnb_buy_price) * 0.996
+                                stopPrice = float(bnb_buy_price) * 0.9905
                                 stopPrice = ("%.17f" % stopPrice).rstrip('0').rstrip('.')
                                 stopPrice = stopPrice[0:stopPrice.find('.') + pair_num_decimals]
-                                stopLimitPrice = float(bnb_buy_price) * 0.995
+                                stopLimitPrice = float(bnb_buy_price) * 0.99
                                 stopLimitPrice = ("%.17f" % stopLimitPrice).rstrip('0').rstrip('.')
                                 stopLimitPrice = stopLimitPrice[0:stopLimitPrice.find('.') + pair_num_decimals]
                                 expBuyPrice = str(bnb_buy_price)

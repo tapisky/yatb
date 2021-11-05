@@ -176,6 +176,9 @@ async def main(config):
                             if order['status'] == "FILLED":
                                 trade['status'] = 'remove'
                                 trade['result'] = 'successful'
+                            elif order['status'] == "EXPIRED":
+                                trade['status'] = 'remove'
+                                trade['result'] = 'unsuccessful'
                     if trade['status'] == 'remove':
                         if config['sim_mode_on']:
                             balance = float(balance) + float(actual_volume)
@@ -884,7 +887,8 @@ async def main(config):
                                                     stopLimitPrice=stopLimitPrice,
                                                     stopLimitTimeInForce="GTC")
                                                 logger.info(result_bnb)
-                                                trades.append({'pair': opp['pair'], 'type': 'real', 'interval': opp['interval'], 'status': 'active', 'orderid': result_bnb['orderId'], 'time': time.time(), 'expirytime': time.time() + 43200.0, 'buyprice': float(bnb_buy_price), 'expsellprice': expSellPrice, 'stoploss': stopLoss, 'quantity': quantity})
+                                                order = list(filter(lambda item: item['type'] == "LIMIT_MAKER", result_bnb['orderReports']))[0]
+                                                trades.append({'pair': opp['pair'], 'type': 'real', 'interval': opp['interval'], 'status': 'active', 'orderid': order['orderId'], 'time': time.time(), 'expirytime': time.time() + 43200.0, 'buyprice': float(bnb_buy_price), 'expsellprice': expSellPrice, 'stoploss': stopLimitPrice, 'quantity': quantity})
                                                 sim_trades -= 1
                                                 break
                                             except:

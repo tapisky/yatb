@@ -662,6 +662,7 @@ async def main(config):
                     logger.info("Opps ==========>")
                     logger.info(opps)
                     if opps:
+                        seconds_to_candle_end = 0
                         if opps[0]['interval'] == '2h' and time.gmtime()[4] > 50 and time.gmtime()[4] < 59:
                             logger.info("Waiting until 90 seconds before candle close time to re-check indicators")
                             if time.gmtime()[3] < 23:

@@ -708,6 +708,18 @@ async def main(config):
                                         logger.info("Could not verify if the 2H opportunity is still good near candle close time")
                                         continue
                                 ongoingTradePairs.append({'pair': opp['pair'], 'expiryTime': time.time() + 5400.0})
+                                bnb_buy_price = None
+                                del bnb_buy_price
+                                for _ in range(5):
+                                    try:
+                                        bnb_tickers = bnb_exchange.get_orderbook_tickers()
+                                        bnb_ticker = next(item for item in bnb_tickers if item['symbol'] == opp['pair'])
+                                        bnb_buy_price = bnb_ticker['bidPrice']
+                                        break
+                                    except:
+                                        logger.info(f"{opp['pair']} | Re-trying ticker...")
+                                        await asyncio.sleep(2)
+                                        continue
                                 if opp['interval'] == "1d":
                                     expectedProfitPercentage = 1.007
                                     stopPrice = float(bnb_buy_price) * 0.9855
@@ -720,9 +732,6 @@ async def main(config):
                                     expectedProfitPercentage = 1.00235
                                     stopPrice = float(bnb_buy_price) * 0.9905
                                     stopLimitPrice = float(bnb_buy_price) * 0.99
-                                bnb_tickers = bnb_exchange.get_orderbook_tickers()
-                                bnb_ticker = next(item for item in bnb_tickers if item['symbol'] == opp['pair'])
-                                bnb_buy_price = bnb_ticker['bidPrice']
                                 # buy_price = ('%.8f' % float(bnb_buy_price)).rstrip('0').rstrip('.')
                                 info = bnb_exchange.get_symbol_info(opp['pair'])
                                 tickSize = info['filters'][0]['tickSize']

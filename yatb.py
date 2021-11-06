@@ -662,28 +662,28 @@ async def main(config):
                     logger.info("Opps ==========>")
                     logger.info(opps)
                     if opps:
-                        # if opps[0]['interval'] in ['2h', '1d']:
-                        #     logger.info("Waiting until 90 seconds before candle close time to re-check indicators")
-                        #     if time.gmtime()[3] < 23:
-                        #         candle_end = datetime.datetime(time.gmtime()[0], time.gmtime()[1], time.gmtime()[2], time.gmtime()[3] + 1)
-                        #     else:
-                        #         tomorrow = datetime.datetime(time.gmtime()[0], time.gmtime()[1], time.gmtime()[2]) + timedelta(hours=24)
-                        #         candle_end = datetime.datetime(tomorrow.year, tomorrow.month, tomorrow.day)
-                        #     now = datetime.datetime(time.gmtime()[0], time.gmtime()[1], time.gmtime()[2], time.gmtime()[3],time.gmtime()[4], time.gmtime()[5])
-                        #     seconds_to_candle_end = (candle_end - now).seconds
-                        #     # Update google sheet status field
-                        #     dateStamp = datetime_helper.utcnow().strftime("%d/%m/%Y %H:%M:%S")
-                        #     statusMessage = f"{dateStamp} -- Iteration {iteration}: Waiting until 90 seconds before candle close"
-                        #     for _ in range(3):
-                        #         try:
-                        #             update_google_sheet_status(config['sheet_id'], statusMessage)
-                        #             break
-                        #         except:
-                        #             logger.info(traceback.format_exc())
-                        #             await asyncio.sleep(1)
-                        #             continue
-                        #     if seconds_to_candle_end > 90:
-                        #         await asyncio.sleep(seconds_to_candle_end - 90)
+                        if opps[0]['interval'] == '2h' and time.gmtime()[4] > 50 and time.gmtime()[4] < 59:
+                            logger.info("Waiting until 90 seconds before candle close time to re-check indicators")
+                            if time.gmtime()[3] < 23:
+                                candle_end = datetime.datetime(time.gmtime()[0], time.gmtime()[1], time.gmtime()[2], time.gmtime()[3] + 1)
+                            else:
+                                tomorrow = datetime.datetime(time.gmtime()[0], time.gmtime()[1], time.gmtime()[2]) + timedelta(hours=24)
+                                candle_end = datetime.datetime(tomorrow.year, tomorrow.month, tomorrow.day)
+                            now = datetime.datetime(time.gmtime()[0], time.gmtime()[1], time.gmtime()[2], time.gmtime()[3],time.gmtime()[4], time.gmtime()[5])
+                            seconds_to_candle_end = (candle_end - now).seconds
+                            # Update google sheet status field
+                            dateStamp = datetime_helper.utcnow().strftime("%d/%m/%Y %H:%M:%S")
+                            statusMessage = f"{dateStamp} -- Iteration {iteration}: Waiting until 90 seconds before candle close"
+                            for _ in range(3):
+                                try:
+                                    update_google_sheet_status(config['sheet_id'], statusMessage)
+                                    break
+                                except:
+                                    logger.info(traceback.format_exc())
+                                    await asyncio.sleep(1)
+                                    continue
+                            if seconds_to_candle_end > 90:
+                                await asyncio.sleep(seconds_to_candle_end - 90)
                         for opp in opps:
                             if sim_trades > 0:
                                 # If 2h opp, check again if techincal info is still ok; if not, skip this opp
@@ -709,10 +709,16 @@ async def main(config):
                                 ongoingTradePairs.append({'pair': opp['pair'], 'expiryTime': time.time() + 5400.0})
                                 if opp['interval'] == "1d":
                                     expectedProfitPercentage = 1.007
+                                    stopPrice = float(bnb_buy_price) * 0.9855
+                                    stopLimitPrice = float(bnb_buy_price) * 0.985
                                 elif opp['interval'] == "4h":
                                     expectedProfitPercentage = 1.0035
+                                    stopPrice = float(bnb_buy_price) * 0.9905
+                                    stopLimitPrice = float(bnb_buy_price) * 0.99
                                 else:
                                     expectedProfitPercentage = 1.00235
+                                    stopPrice = float(bnb_buy_price) * 0.9905
+                                    stopLimitPrice = float(bnb_buy_price) * 0.99
                                 bnb_tickers = bnb_exchange.get_orderbook_tickers()
                                 bnb_ticker = next(item for item in bnb_tickers if item['symbol'] == opp['pair'])
                                 bnb_buy_price = bnb_ticker['bidPrice']
@@ -728,10 +734,8 @@ async def main(config):
                                 expSellPrice = float(bnb_buy_price) * expectedProfitPercentage
                                 expSellPrice = ("%.17f" % expSellPrice).rstrip('0').rstrip('.')
                                 expSellPrice = expSellPrice[0:expSellPrice.find('.') + pair_num_decimals]
-                                stopPrice = float(bnb_buy_price) * 0.9905
                                 stopPrice = ("%.17f" % stopPrice).rstrip('0').rstrip('.')
                                 stopPrice = stopPrice[0:stopPrice.find('.') + pair_num_decimals]
-                                stopLimitPrice = float(bnb_buy_price) * 0.99
                                 stopLimitPrice = ("%.17f" % stopLimitPrice).rstrip('0').rstrip('.')
                                 stopLimitPrice = stopLimitPrice[0:stopLimitPrice.find('.') + pair_num_decimals]
                                 expBuyPrice = str(bnb_buy_price)

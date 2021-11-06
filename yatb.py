@@ -662,28 +662,28 @@ async def main(config):
                     logger.info("Opps ==========>")
                     logger.info(opps)
                     if opps:
-                        if opps[0]['interval'] in ['2h', '1d']:
-                            logger.info("Waiting until 90 seconds before candle close time to re-check indicators")
-                            if time.gmtime()[3] < 23:
-                                candle_end = datetime.datetime(time.gmtime()[0], time.gmtime()[1], time.gmtime()[2], time.gmtime()[3] + 1)
-                            else:
-                                tomorrow = datetime.datetime(time.gmtime()[0], time.gmtime()[1], time.gmtime()[2]) + timedelta(hours=24)
-                                candle_end = datetime.datetime(tomorrow.year, tomorrow.month, tomorrow.day)
-                            now = datetime.datetime(time.gmtime()[0], time.gmtime()[1], time.gmtime()[2], time.gmtime()[3],time.gmtime()[4], time.gmtime()[5])
-                            seconds_to_candle_end = (candle_end - now).seconds
-                            # Update google sheet status field
-                            dateStamp = datetime_helper.utcnow().strftime("%d/%m/%Y %H:%M:%S")
-                            statusMessage = f"{dateStamp} -- Iteration {iteration}: Waiting until 90 seconds before candle close"
-                            for _ in range(3):
-                                try:
-                                    update_google_sheet_status(config['sheet_id'], statusMessage)
-                                    break
-                                except:
-                                    logger.info(traceback.format_exc())
-                                    await asyncio.sleep(1)
-                                    continue
-                            if seconds_to_candle_end > 90:
-                                await asyncio.sleep(seconds_to_candle_end - 90)
+                        # if opps[0]['interval'] in ['2h', '1d']:
+                        #     logger.info("Waiting until 90 seconds before candle close time to re-check indicators")
+                        #     if time.gmtime()[3] < 23:
+                        #         candle_end = datetime.datetime(time.gmtime()[0], time.gmtime()[1], time.gmtime()[2], time.gmtime()[3] + 1)
+                        #     else:
+                        #         tomorrow = datetime.datetime(time.gmtime()[0], time.gmtime()[1], time.gmtime()[2]) + timedelta(hours=24)
+                        #         candle_end = datetime.datetime(tomorrow.year, tomorrow.month, tomorrow.day)
+                        #     now = datetime.datetime(time.gmtime()[0], time.gmtime()[1], time.gmtime()[2], time.gmtime()[3],time.gmtime()[4], time.gmtime()[5])
+                        #     seconds_to_candle_end = (candle_end - now).seconds
+                        #     # Update google sheet status field
+                        #     dateStamp = datetime_helper.utcnow().strftime("%d/%m/%Y %H:%M:%S")
+                        #     statusMessage = f"{dateStamp} -- Iteration {iteration}: Waiting until 90 seconds before candle close"
+                        #     for _ in range(3):
+                        #         try:
+                        #             update_google_sheet_status(config['sheet_id'], statusMessage)
+                        #             break
+                        #         except:
+                        #             logger.info(traceback.format_exc())
+                        #             await asyncio.sleep(1)
+                        #             continue
+                        #     if seconds_to_candle_end > 90:
+                        #         await asyncio.sleep(seconds_to_candle_end - 90)
                         for opp in opps:
                             if sim_trades > 0:
                                 # If 2h opp, check again if techincal info is still ok; if not, skip this opp

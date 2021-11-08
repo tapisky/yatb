@@ -939,8 +939,8 @@ async def main(config):
                                                 #     stopLimitPrice=stopLimitPrice,
                                                 #     stopLimitTimeInForce="GTC")
                                                 logger.info(result_bnb)
-                                                order = list(filter(lambda item: item['type'] == "LIMIT_MAKER", result_bnb['orderReports']))[0]
-                                                trades.append({'pair': opp['pair'], 'type': 'real', 'interval': opp['interval'], 'status': 'active', 'orderid': order['orderId'], 'time': time.time(), 'expirytime': expiry_time, 'buyprice': float(bnb_buy_price), 'expsellprice': expSellPrice, 'stoploss': stopLimitPrice, 'quantity': quantity})
+                                                # order = list(filter(lambda item: item['type'] == "LIMIT_MAKER", result_bnb['orderReports']))[0]
+                                                trades.append({'pair': opp['pair'], 'type': 'real', 'interval': opp['interval'], 'status': 'active', 'orderid': result_bnb['orderId'], 'time': time.time(), 'expirytime': expiry_time, 'buyprice': float(bnb_buy_price), 'expsellprice': expSellPrice, 'stoploss': stopLimitPrice, 'quantity': quantity})
                                                 sim_trades -= 1
                                                 break
                                             except:

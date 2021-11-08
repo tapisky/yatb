@@ -179,6 +179,38 @@ async def main(config):
                             elif order['status'] == "EXPIRED":
                                 trade['status'] = 'remove'
                                 trade['result'] = 'unsuccessful'
+                            elif time.time() > trade['expirytime']:
+                                # Cancel order and market sell
+                                for _ in range(10):
+                                    try:
+                                        cancel_order = bnb_exchange.cancel_order(symbol=trade['pair'], orderId=trade['orderid'])
+                                        break
+                                    except:
+                                        logger.info(traceback.format_exc())
+                                        await asyncio.sleep(5)
+                                        continue
+                                trade['status'] = 'remove'
+                                trade['result'] = 'unsuccessful'
+                                # Market sell
+                                bnb_balance_result = bnb_exchange.get_asset_balance(asset=trade['pair'].replace('USDT',''))
+                                if bnb_balance_result:
+                                    bnb_currency_available = bnb_balance_result['free']
+                                else:
+                                    bnb_currency_available = 0.0
+                                result_bnb = None
+                                for _ in range(10):
+                                    try:
+                                        logger.info(f"Attempting market sell {trade['pair']}: Qty = {str(bnb_currency_available)}")
+                                        result_bnb = bnb_exchange.order_market_sell(symbol=trade['pair'], quantity=bnb_currency_available)
+                                        break
+                                    except:
+                                        logger.info(traceback.format_exc())
+                                        await asyncio.sleep(5)
+                                        continue
+                                if result_bnb:
+                                    logger.info(result_bnb)
+                                else:
+                                    raise Exception("Could not market sell after order time expired!!")
                     if trade['status'] == 'remove':
                         if config['sim_mode_on']:
                             balance = float(balance) + float(actual_volume)
@@ -725,7 +757,7 @@ async def main(config):
                                     stopPrice = float(bnb_buy_price) * 0.9855
                                     stopLimitPrice = float(bnb_buy_price) * 0.985
                                 elif opp['interval'] == "4h":
-                                    expectedProfitPercentage = 1.0035
+                                    expectedProfitPercentage = 1.0032
                                     stopPrice = float(bnb_buy_price) * 0.9905
                                     stopLimitPrice = float(bnb_buy_price) * 0.99
                                 else:
@@ -883,6 +915,12 @@ async def main(config):
                                         # Create limit sell order
                                         for _ in range(30):
                                             try:
+                                                # calculate expiry time (let the trade go for a maximum of 3 candle sticks or 1 if it's 1d)
+                                                expiry_time = time.time() + 43200.0
+                                                if opp['interval'] == '1d':
+                                                    expiry_time = time.time() + 57600.0
+                                                elif opp['interval'] == '2h':
+                                                    expiry_time = time.time() + 21600.0
                                                 # calculate trade_amount
                                                 bnb_balance_result = bnb_exchange.get_asset_balance(asset=opp['pair'].replace('USDT',''))
                                                 if bnb_balance_result:
@@ -892,17 +930,17 @@ async def main(config):
                                                 quantity = bnb_currency_available[0:bnb_currency_available.find('.') + lotSize_decimals]
                                                 logger.info(f"Attempting limit order {opp['pair']}: quantity = {str(quantity)}; price = {str(expSellPrice)}")
                                                 result_bnb = None
-                                                # result_bnb = bnb_exchange.order_limit_sell(symbol=opp['pair'], quantity=quantity, price=expSellPrice)
-                                                result_bnb = bnb_exchange.order_oco_sell(
-                                                    symbol=opp['pair'],
-                                                    quantity=quantity,
-                                                    price=expSellPrice,
-                                                    stopPrice=stopPrice,
-                                                    stopLimitPrice=stopLimitPrice,
-                                                    stopLimitTimeInForce="GTC")
+                                                result_bnb = bnb_exchange.order_limit_sell(symbol=opp['pair'], quantity=quantity, price=expSellPrice)
+                                                # result_bnb = bnb_exchange.order_oco_sell(
+                                                #     symbol=opp['pair'],
+                                                #     quantity=quantity,
+                                                #     price=expSellPrice,
+                                                #     stopPrice=stopPrice,
+                                                #     stopLimitPrice=stopLimitPrice,
+                                                #     stopLimitTimeInForce="GTC")
                                                 logger.info(result_bnb)
                                                 order = list(filter(lambda item: item['type'] == "LIMIT_MAKER", result_bnb['orderReports']))[0]
-                                                trades.append({'pair': opp['pair'], 'type': 'real', 'interval': opp['interval'], 'status': 'active', 'orderid': order['orderId'], 'time': time.time(), 'expirytime': time.time() + 43200.0, 'buyprice': float(bnb_buy_price), 'expsellprice': expSellPrice, 'stoploss': stopLimitPrice, 'quantity': quantity})
+                                                trades.append({'pair': opp['pair'], 'type': 'real', 'interval': opp['interval'], 'status': 'active', 'orderid': order['orderId'], 'time': time.time(), 'expirytime': expiry_time, 'buyprice': float(bnb_buy_price), 'expsellprice': expSellPrice, 'stoploss': stopLimitPrice, 'quantity': quantity})
                                                 sim_trades -= 1
                                                 break
                                             except:

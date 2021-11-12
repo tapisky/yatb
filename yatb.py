@@ -317,6 +317,7 @@ async def main(config):
                         if pair in usdt_tickers and pair not in excludedPairs:
                             # Initialize variables
                             kline1DayRatio = None
+                            kline12HoursRatio = None
                             kline4HoursRatio = None
                             kline2HoursRatio = None
                             prev4HKlineClose = None
@@ -336,11 +337,16 @@ async def main(config):
                             prev1DStochFFastK = None
                             this1DStochFFastK = None
                             this1DStochFFastD = None
+                            this12HRsi = None
+                            prev12HStochFFastK = None
+                            this12HStochFFastK = None
+                            this12HStochFFastD = None
                             this2HRsi = None
                             this2HStochFFastK = None
                             this2HStochFFastD = None
                             prev2HStochFFastD = None
                             del kline1DayRatio
+                            del kline12HoursRatio
                             del kline4HoursRatio
                             del kline2HoursRatio
                             del prev4HKlineClose
@@ -360,6 +366,10 @@ async def main(config):
                             del prev1DStochFFastK
                             del this1DStochFFastK
                             del this1DStochFFastD
+                            del this12HRsi
+                            del prev12HStochFFastK
+                            del this12HStochFFastK
+                            del this12HStochFFastD
                             del this2HRsi
                             del this2HStochFFastK
                             del this2HStochFFastD
@@ -430,6 +440,74 @@ async def main(config):
                                         break
                                     except:
                                         logger.info(f"{pair} | TAAPI Response (1D): {response.reason}. Trying again...")
+                                        await asyncio.sleep(2)
+                                        continue
+
+                            # Get 12 Hours tech info if the 12 Hours candle is about to finish
+                            if time.gmtime()[3] % 12 == 11 and time.gmtime()[4] >= 53:
+                                for _ in range(5):
+                                    try:
+                                        this12HKlineClose = None
+                                        this12HKlineLow = None
+                                        klines12Hours = bnb_exchange.get_historical_klines(pair, bnb_exchange.KLINE_INTERVAL_12HOUR, "12 hours ago UTC")
+                                        this12HKlineClose = float(klines12Hours[0][4])
+                                        this12HKlineLow = float(klines12Hours[0][3])
+                                        kline12HoursRatio = this12HKlineClose/this12HKlineLow
+                                        break
+                                    except:
+                                        logger.info(f"Retrying... ({pair})")
+                                        await asyncio.sleep(2)
+                                        continue
+                                taapiSymbol = pair.split('USDT')[0] + "/" + "USDT"
+                                endpoint = "https://api.taapi.io/bulk"
+
+                                parameters = {
+                                    "secret": config['taapi_api_key'],
+                                    "construct": {
+                                        "exchange": "binance",
+                                        "symbol": taapiSymbol,
+                                        "interval": "12h",
+                                        "indicators": [
+                                        {
+                                            # Current Relative Strength Index
+                                            "id": "thisrsi",
+                                	        "indicator": "rsi"
+                                        },
+                                        {
+                                            # Current stoch fast
+                                            "id": "thisstochf",
+                                            "indicator": "stochf",
+                                            "optInFastK_Period": 3,
+                                            "optInFastD_Period": 3
+                                        },
+                                        {
+                                            # Previous stoch fast
+                                            "id": "prevstochf",
+                                            "indicator": "stochf",
+                                            "backtrack": 1,
+                                            "optInFastK_Period": 3,
+                                            "optInFastD_Period": 3
+                                        }
+                                        ]
+                                    }
+                                }
+
+                                for _ in range(5):
+                                    try:
+                                        # Send POST request and save the response as response object
+                                        response = requests.post(url = endpoint, json = parameters)
+
+                                        # Extract data in json format
+                                        result = response.json()
+
+                                        this12HRsi = float(result['data'][0]['result']['value'])
+                                        this12HStochFFastK = float(result['data'][1]['result']['valueFastK'])
+                                        this12HStochFFastD = float(result['data'][1]['result']['valueFastD'])
+                                        prev12HStochFFastK = float(result['data'][2]['result']['valueFastK'])
+                                        await asyncio.sleep(2)
+                                        break
+                                    except:
+                                        logger.info(f"{pair} | TAAPI Response (12H): {response.reason}. Trying again...")
                                         await asyncio.sleep(2)
                                         continue
 
@@ -616,6 +694,8 @@ async def main(config):
                             try:
                                 if time.gmtime()[3] % 24 == 23 and time.gmtime()[4] >= 53:
                                     logger.info(f"1D Data: {pair} | kline1DayRatio {str(round(kline1DayRatio, 4))} | This RSI {str(round(this1DRsi, 2))} | Prev StochF K {str(round(prev1DStochFFastK, 2))} | This StochF K,D {str(round(this1DStochFFastK, 2))}|{str(round(this1DStochFFastD, 2))}")
+                                if time.gmtime()[3] % 12 == 11 and time.gmtime()[4] >= 53:
+                                    logger.info(f"12H Data: {pair} | kline12HoursRatio {str(round(kline12HoursRatio, 4))} | This RSI {str(round(this12HRsi, 2))} | Prev StochF K {str(round(prev12HStochFFastK, 2))} | This StochF K,D {str(round(this12HStochFFastK, 2))}|{str(round(this12HStochFFastD, 2))}")
                                 if time.gmtime()[3] % 4 == 3 and time.gmtime()[4] >= 53:
                                     logger.info(f"4H Data: {pair} | kline4HoursRatio {str(round(kline4HoursRatio, 4))} | Prev Kline {str(prev4HKline)} | This Kline {str(this4HKline)} | Prev Kline Low {str(prev4HKlineLow)} | Prev Lower Bolinger {str(prev4HBolingerLowBand)} | Prev RSI {str(round(prev4HRsi, 2))} | This RSI {str(round(this4HRsi, 2))} | Prev StochF K,D {str(round(prev4HStochFFastK, 2))}|{str(round(prev4HStochFFastD, 2))} | This StochF K,D {str(round(this4HStochFFastK, 2))}|{str(round(this4HStochFFastD, 2))}")
                                 logger.info(f"2H Data: {pair} | kline2HoursRatio {str(round(kline2HoursRatio, 4))} | This RSI {str(round(this2HRsi, 2))} | Prev StochF D {str(round(prev2HStochFFastD, 2))} | This StochF K,D {str(round(this2HStochFFastK, 2))}|{str(round(this2HStochFFastD, 2))} | This Lower Bolinger {str(round(this2HBolinger, 4))}")
@@ -626,8 +706,8 @@ async def main(config):
                                     and time.gmtime()[4] >= 53
                                     and this1DRsi < 69.0
                                     and this1DStochFFastK < 14.5
-                                    and this1DStochFFastK < this2HStochFFastD
-                                    and this1DStochFFastK + 10.0 < this2HStochFFastD
+                                    and this1DStochFFastK < this1DStochFFastD
+                                    and this1DStochFFastK + 10.0 < this1DStochFFastD
                                     and prev1DStochFFastK < 78.0
                                     and kline1DayRatio > 1.006
                                     and sim_trades > 0
@@ -635,6 +715,20 @@ async def main(config):
                                     # Put 1D opportunities in opps dict
                                     opps.append({'pair': pair, 'interval': "1d", 'priority': 1})
                                     logger.info(f"{pair} good candidate for the 1 day strategy")
+                                elif (
+                                    time.gmtime()[3] % 12 == 11
+                                    and time.gmtime()[4] >= 53
+                                    and this12HRsi < 69.0
+                                    and this12HStochFFastK < 14.5
+                                    and this12HStochFFastK < this12HStochFFastD
+                                    and this12HStochFFastK + 10.0 < this12HStochFFastD
+                                    and prev12HStochFFastK < 78.0
+                                    and kline12HoursRatio > 1.003
+                                    and sim_trades > 0
+                                ):
+                                    # Put 12H opportunities in opps dict
+                                    opps.append({'pair': pair, 'interval': "1d", 'priority': 2})
+                                    logger.info(f"{pair} good candidate for the 12h strategy")
                                 elif (
                                     (time.gmtime()[3] % 4 == 3
                                     and time.gmtime()[4] >= 53
@@ -664,7 +758,7 @@ async def main(config):
                                     )
                                 ):
                                     # Put 4H opportunities in opps dict
-                                    opps.append({'pair': pair, 'interval': "4h", 'priority': 2})
+                                    opps.append({'pair': pair, 'interval': "4h", 'priority': 3})
                                     logger.info(f"{pair} good candidate for one of the 4H strategies")
                                 elif (
                                     time.gmtime()[3] % 2 == 1
@@ -682,7 +776,7 @@ async def main(config):
                                     and sim_trades > 0
                                 ):
                                     # Put 2H opportunities in opps dict
-                                    opps.append({'pair': pair, 'interval': "2h", 'priority': 3})
+                                    opps.append({'pair': pair, 'interval': "2h", 'priority': 4})
                                     logger.info(f"{pair} good candidate for 2H low Stochastic Fast K stategy")
                                 else:
                                     logger.info(f"{pair} not a good entry point")
@@ -754,6 +848,10 @@ async def main(config):
                                         continue
                                 if opp['interval'] == "1d":
                                     expectedProfitPercentage = 1.007
+                                    stopPrice = float(bnb_buy_price) * 0.9855
+                                    stopLimitPrice = float(bnb_buy_price) * 0.985
+                                elif opp['interval'] == "12h":
+                                    expectedProfitPercentage = 1.004
                                     stopPrice = float(bnb_buy_price) * 0.9855
                                     stopLimitPrice = float(bnb_buy_price) * 0.985
                                 elif opp['interval'] == "4h":
@@ -917,7 +1015,7 @@ async def main(config):
                                             try:
                                                 # calculate expiry time (let the trade go for a maximum of 3 candle sticks or 1 if it's 1d)
                                                 expiry_time = time.time() + 43200.0
-                                                if opp['interval'] == '1d':
+                                                if opp['interval'] == '1d' or opp['interval'] == '12h':
                                                     expiry_time = time.time() + 57600.0
                                                 elif opp['interval'] == '2h':
                                                     expiry_time = time.time() + 21600.0

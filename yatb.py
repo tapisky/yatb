@@ -727,7 +727,7 @@ async def main(config):
                                     and sim_trades > 0
                                 ):
                                     # Put 12H opportunities in opps dict
-                                    opps.append({'pair': pair, 'interval': "1d", 'priority': 2})
+                                    opps.append({'pair': pair, 'interval': "12h", 'priority': 2})
                                     logger.info(f"{pair} good candidate for the 12h strategy")
                                 elif (
                                     (time.gmtime()[3] % 4 == 3

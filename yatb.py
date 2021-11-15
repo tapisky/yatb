@@ -859,7 +859,7 @@ async def main(config):
                                     stopPrice = float(bnb_buy_price) * 0.9905
                                     stopLimitPrice = float(bnb_buy_price) * 0.99
                                 else:
-                                    expectedProfitPercentage = 1.00235
+                                    expectedProfitPercentage = 1.0024
                                     stopPrice = float(bnb_buy_price) * 0.9905
                                     stopLimitPrice = float(bnb_buy_price) * 0.99
                                 # buy_price = ('%.8f' % float(bnb_buy_price)).rstrip('0').rstrip('.')

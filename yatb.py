@@ -716,7 +716,7 @@ async def main(config):
                                     and this1DStochFFastK + 10.0 < this1DStochFFastD
                                     and prev1DStochFFastK < 78.0
                                     and prev1DStochFFastK < prev1DStochFFastD
-                                    and prev1DStochFFastK - this1DStochFFastK < 25.0
+                                    and prev1DStochFFastK - this1DStochFFastK < 20.0
                                     and kline1DayRatio > 1.006
                                     and sim_trades > 0
                                 ):
@@ -732,7 +732,7 @@ async def main(config):
                                     and this12HStochFFastK + 10.0 < this12HStochFFastD
                                     and prev12HStochFFastK < 78.0
                                     and prev12HStochFFastK < prev12HStochFFastD
-                                    and prev12HStochFFastK - this12HStochFFastK < 25.0
+                                    and prev12HStochFFastK - this12HStochFFastK < 20.0
                                     and kline12HoursRatio > 1.003
                                     and sim_trades > 0
                                 ):

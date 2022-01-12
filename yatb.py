@@ -710,7 +710,7 @@ async def main(config):
                                 if (
                                     time.gmtime()[3] % 24 == 23
                                     and time.gmtime()[4] >= 53
-                                    and this1DRsi < 69.0
+                                    and this1DRsi < 43.0
                                     and this1DStochFFastK < 14.5
                                     and this1DStochFFastK < this1DStochFFastD
                                     and this1DStochFFastK + 10.0 < this1DStochFFastD

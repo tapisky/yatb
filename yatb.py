@@ -726,7 +726,7 @@ async def main(config):
                                 elif (
                                     time.gmtime()[3] % 12 == 11
                                     and time.gmtime()[4] >= 53
-                                    and this12HRsi < 69.0
+                                    and this12HRsi < 45.0
                                     and this12HStochFFastK < 14.5
                                     and this12HStochFFastK < this12HStochFFastD
                                     and this12HStochFFastK + 10.0 < this12HStochFFastD

@@ -751,7 +751,7 @@ async def main(config):
                                         and time.gmtime()[4] >= 53
                                         and prev4HKline == 'negative'
                                         and this4HKline == 'positive'
-                                        and float(this4HKlineLow) < float(this4HBolingerLowBand)
+                                        and float(this4HKlineClose) < float(this4HBolingerLowBand)
                                         and float(this4HKlineClose) < float(this4HBolingerMidBand)
                                         and sim_trades > 0
                                     )
@@ -763,7 +763,7 @@ async def main(config):
                                         and this4HStochFFastK > 75.0
                                         and this4HStochFFastK < 99.0
                                         and this4HStochFFastK - this4HStochFFastD > (this4HStochFFastK * 0.275)
-                                        and this4HRsi < 61.0
+                                        and this4HRsi < 55.0
                                         and sim_trades > 0)
                                     )
                                 ):

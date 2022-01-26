@@ -773,9 +773,8 @@ async def main(config):
                                 elif (
                                     time.gmtime()[3] % 2 == 1
                                     and time.gmtime()[4] >= 53
-                                    and this2HRsi < 69.0
-                                    and this2HRsi > 40.0
-                                    and this2HStochFFastK < 14.5
+                                    and this2HRsi < 35.0
+                                    and this2HStochFFastK < 13.0
                                     and this2HStochFFastK < this2HStochFFastD
                                     and (this2HStochFFastK + 10.0 < this2HStochFFastD
                                         and this2HStochFFastD > prev2HStochFFastD - 15.0
@@ -869,7 +868,7 @@ async def main(config):
                                     stopPrice = float(bnb_buy_price) * 0.9905
                                     stopLimitPrice = float(bnb_buy_price) * 0.99
                                 else:
-                                    expectedProfitPercentage = 1.0024
+                                    expectedProfitPercentage = 1.0023
                                     stopPrice = float(bnb_buy_price) * 0.9905
                                     stopLimitPrice = float(bnb_buy_price) * 0.99
                                 # buy_price = ('%.8f' % float(bnb_buy_price)).rstrip('0').rstrip('.')

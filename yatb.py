@@ -197,6 +197,15 @@ async def main(config):
                                     bnb_currency_available = bnb_balance_result['free']
                                 else:
                                     bnb_currency_available = 0.0
+                                info = bnb_exchange.get_symbol_info(trade['pair'])
+                                tickSize = info['filters'][0]['tickSize']
+                                pair_num_decimals = tickSize.find('1')
+                                lotSize = info['filters'][2]['stepSize']
+                                if lotSize.find('1') == 0:
+                                    lotSize_decimals = 0
+                                else:
+                                    lotSize_decimals = lotSize.find('1')
+                                bnb_currency_available = bnb_currency_available[0:bnb_currency_available.find('.') + lotSize_decimals]
                                 result_bnb = None
                                 for _ in range(10):
                                     try:

@@ -45,7 +45,7 @@ class Binance:
 async def main(config):
     iteration = 0
 
-    stable_coins = ['USDCUSDT', 'PAXUSDT', 'ONGUSDT', 'TUSDUSDT', 'BUSDUSDT', 'ONTUSDT', 'GUSDUSDT', 'DGXUSDT', 'DAIUSDT']
+    stable_coins = ['USDCUSDT', 'PAXUSDT', 'ONGUSDT', 'TUSDUSDT', 'BUSDUSDT', 'ONTUSDT', 'GUSDUSDT', 'DGXUSDT', 'DAIUSDT', 'USTUSDT']
 
     # Binance API setup
     binance = Binance(public_key=config['bnb_api_key'], secret_key=config['bnb_api_secret'], sync=True)

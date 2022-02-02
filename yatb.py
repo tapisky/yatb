@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import asyncio
+import aiohttp
 import time
 import logging
 import yaml
@@ -22,6 +23,7 @@ from cryptocom.exchange.structs import Pair
 from cryptocom.exchange.structs import PrivateTrade
 from binance.client import Client as Client
 from binance.exceptions import *
+from asynckraken import ClientKrk
 from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
@@ -46,6 +48,13 @@ async def main(config):
     iteration = 0
 
     stable_coins = ['USDCUSDT', 'PAXUSDT', 'ONGUSDT', 'TUSDUSDT', 'BUSDUSDT', 'ONTUSDT', 'GUSDUSDT', 'DGXUSDT', 'DAIUSDT', 'USTUSDT']
+    stable_fiat_coins = ["USDT", "CAD", "GBP", "USDC", "EUR", "CHZ", "JPY", "PAX", "DAI", "CHF"]
+
+    # Kraken API setup
+    krk_exchange = ClientKrk(key=config['krk_api_key'], secret=config['krk_api_secret'])
+    krk_assets = krk_exchange.query_public('AssetPairs')
+    dict2 = [x for x in krk_assets['result'] if "USD" in x]
+    dict3 = [x for x in dict2 if not any(sub in x for sub in stable_fiat_coins)]
 
     # Binance API setup
     binance = Binance(public_key=config['bnb_api_key'], secret_key=config['bnb_api_secret'], sync=True)
